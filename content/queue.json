@@ -1,0 +1,12 @@
+[
+  {
+    "id": "post-001",
+    "text": "🚀 GitHub Actions와 Threads Graph API를 연동한 자동 포스팅 테스트 글입니다! #개발 #자동화 #ThreadsAPI",
+    "status": "pending"
+  },
+  {
+    "id": "post-002",
+    "text": "💡 깃허브 레포지토리의 queue.json에 글을 적어두기만 하면 매일 정해진 시간에 자동으로 스레드에 업로드됩니다.",
+    "status": "pending"
+  }
+]

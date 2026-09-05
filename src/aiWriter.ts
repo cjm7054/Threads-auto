@@ -88,4 +88,45 @@ ${snippetContext}
 
     return `📌 [인사이트랩365 추가 정보 안내]\n\n${blogText}\n👉 ${blogUrl}\n\n${coupangText}\n👉 ${coupangUrl}\n\n${disclaimer}\n\n${followMsg}`;
   }
+
+  /**
+   * 이슈 주제를 바탕으로 고화질 AI 일러스트/실사 이미지 URL을 생성합니다.
+   * (기사 실제 사진이 없을 경우 대체용)
+   */
+  async generateImageUrl(trend: TrendItem): Promise<string> {
+    try {
+      // Gemini를 활용하여 해당 이슈에 어울리는 영문 시각화 프롬프트 1문장 생성
+      const promptQuery = `Topic: "${trend.title}". Related: "${trend.newsTitle || ''}".
+Generate a single short English prompt (under 15 words) for an image generator (like Midjourney or DALL-E) to create an editorial photo or high-quality illustration representing this news topic. 
+Do not include quotation marks, style jargon, or explanations. Output ONLY the prompt text in English.`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptQuery }] }],
+          generationConfig: { maxOutputTokens: 60, temperature: 0.5 },
+        }),
+      });
+
+      let imagePrompt = "";
+      if (response.ok) {
+        const data = await response.json() as any;
+        imagePrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      }
+
+      if (!imagePrompt) {
+        imagePrompt = `news editorial concept for ${trend.title}`;
+      }
+
+      // 안전한 URL 인코딩 적용 (Pollinations 고화질 이미지 생성 서비스)
+      const encodedPrompt = encodeURIComponent(imagePrompt.replace(/[\n\r]/g, " ").slice(0, 120));
+      return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1080&nologo=true`;
+    } catch (err) {
+      console.warn("⚠️ AI 이미지 생성 URL 구성 중 오류, 기본 트렌드 이미지 대체:", err);
+      const safeTitle = encodeURIComponent(trend.title);
+      return `https://image.pollinations.ai/prompt/breaking%20news%20concept%20${safeTitle}?width=1080&height=1080&nologo=true`;
+    }
+  }
 }

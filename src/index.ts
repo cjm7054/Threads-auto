@@ -69,12 +69,23 @@ async function main() {
     }
 
     console.log("------------------------------------------");
-    console.log("📝 [1단계] 생성된 스레드 본문 (링크 없는 고도달 포스트):\n" + generatedText);
+    console.log("📝 [1단계] 생성된 스레드 본문 (고도달 포스트):\n" + generatedText);
     console.log("------------------------------------------");
 
-    // 1단계: 본문 단독 포스팅 (외부 링크 제거 -> 알고리즘 도달률 극대화)
+    // 3안 전략: 뉴스 기사 대표 사진 우선 사용 -> 없을 경우 Gemini AI 맞춤 이미지 생성
+    let postImageUrl = selectedTrend.pictureUrl;
+    if (postImageUrl) {
+      console.log(`🖼️ [뉴스 사진 발견] 기사 대표 썸네일을 첨부합니다: ${postImageUrl}`);
+    } else {
+      console.log(`🎨 [뉴스 사진 없음] Gemini AI 기반 맞춤 시각화 이미지 생성 중...`);
+      postImageUrl = await aiWriter.generateImageUrl(selectedTrend);
+      console.log(`🖼️ [AI 이미지 준비 완료] ${postImageUrl}`);
+    }
+
+    // 1단계: 본문 + 이미지 포스팅 (알고리즘 도달률 및 피드 주목도 극대화)
     const result = await client.post({
       text: generatedText,
+      imageUrl: postImageUrl,
     });
 
     if (result.success && result.threadId) {

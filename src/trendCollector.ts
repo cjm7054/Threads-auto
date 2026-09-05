@@ -8,6 +8,7 @@ export interface TrendItem {
   newsTitle?: string;
   newsUrl?: string;
   snippet?: string;
+  pictureUrl?: string;
 }
 
 export class TrendCollector {
@@ -57,12 +58,19 @@ export class TrendCollector {
                            rawItem.match(/<ht:news_item_snippet>(.*?)<\/ht:news_item_snippet>/);
       const snippet = snippetMatch ? snippetMatch[1].trim() : undefined;
 
+      const pictureMatch = rawItem.match(/<ht:picture><!\[CDATA\[(.*?)\]\]><\/ht:picture>/) ||
+                           rawItem.match(/<ht:picture>(.*?)<\/ht:picture>/) ||
+                           rawItem.match(/<ht:news_item_picture><!\[CDATA\[(.*?)\]\]><\/ht:news_item_picture>/) ||
+                           rawItem.match(/<ht:news_item_picture>(.*?)<\/ht:news_item_picture>/);
+      const pictureUrl = pictureMatch ? pictureMatch[1].trim() : undefined;
+
       items.push({
         title,
         approxTraffic,
         newsTitle,
         newsUrl,
         snippet,
+        pictureUrl,
       });
     }
 

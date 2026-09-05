@@ -2,7 +2,9 @@
   {
     "id": "post-001",
     "text": "🚀 GitHub Actions와 Threads Graph API를 연동한 자동 포스팅 테스트 글입니다! #개발 #자동화 #ThreadsAPI",
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-09-05T06:03:57.453Z",
+    "threadId": "18026341571906088"
   },
   {
     "id": "post-002",

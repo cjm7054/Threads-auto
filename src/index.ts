@@ -107,21 +107,32 @@ async function main() {
         console.log("📝 대댓글 본문:\n" + replyText);
         console.log("------------------------------------------");
 
-        // Threads API 딜레이 (본문이 서버에 완전히 등록되어 reply_to_id 조회가 가능할 때까지 8초 대기)
+        // Threads API 딜레이 및 재시도 (이미지가 포함된 본문은 인덱싱에 10~15초 소요됨)
+        let replySuccess = false;
         if (!isDryRun) {
-          console.log("⏳ 본문 인덱싱 대기 중 (8초)...");
-          await new Promise((r) => setTimeout(r, 8000));
-        }
+          console.log("⏳ 본문 인덱싱 대기 중 (12초)...");
+          await new Promise((r) => setTimeout(r, 12000));
 
-        const replyResult = await client.post({
-          text: replyText,
-          replyToId: result.threadId,
-        });
+          // 최대 3회 재시도 루프
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            console.log(`[Threads] 대댓글 발행 시도 (${attempt}/3)...`);
+            const replyResult = await client.post({
+              text: replyText,
+              replyToId: result.threadId,
+            });
 
-        if (replyResult.success) {
-          console.log(`🚀 [수익 대댓글 발행 성공!] (Reply ID: ${replyResult.threadId})`);
-        } else {
-          console.warn(`⚠️ 대댓글 발행 실패 (본문은 정상 게시됨): ${replyResult.error}`);
+            if (replyResult.success) {
+              console.log(`🚀 [수익 대댓글 발행 성공!] (Reply ID: ${replyResult.threadId})`);
+              replySuccess = true;
+              break;
+            } else {
+              console.warn(`⚠️ 대댓글 시도 ${attempt} 실패: ${replyResult.error}`);
+              if (attempt < 3) {
+                console.log("⏳ 8초 후 재시도합니다...");
+                await new Promise((r) => setTimeout(r, 8000));
+              }
+            }
+          }
         }
       } catch (replyErr: any) {
         console.warn(`⚠️ 대댓글 생성 중 예외 발생 (본문은 정상 게시됨):`, replyErr.message || replyErr);

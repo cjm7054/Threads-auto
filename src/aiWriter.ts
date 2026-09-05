@@ -19,16 +19,21 @@ export class AiWriter {
     const newsContext = trend.newsTitle ? `관련 기사: "${trend.newsTitle}"` : "";
     const snippetContext = trend.snippet ? `내용: ${trend.snippet}` : "";
 
-    const userPrompt = `주제: [${trend.title}]
-${newsContext}
-${snippetContext}
+    const userPrompt = `대한민국 메타 스레드(Threads)에 업로드할 인기 피드 글을 한국어로 작성해줘.
 
-위 실시간 트렌드 주제로 한국 스레드(Threads)에 올릴 글을 재미있게 작성해줘.
-3~4개 문단으로 무슨 일인지 쉽게 설명하고, 마지막엔 사람들에게 생각을 묻는 질문과 함께 "👉 더 자세한 전체 분석 리포트랑 꿀팁은 첫 댓글에 남겨둘게요! 👇" 문구와 해시태그를 달아줘.
-영어 메모나 체크리스트 같은 것은 일절 쓰지 말고, 실제 올라갈 게시글 본문만 바로 출력해.`;
+주제 키워드: ${trend.title}
+관련 뉴스: ${trend.newsTitle || '실시간 인기 이슈'}
+${trend.snippet ? '요약: ' + trend.snippet : ''}
+
+[작성 요구사항]
+1. 사람들의 흥미를 끄는 강력한 첫 줄 훅(Hook)으로 시작하세요.
+2. 2~3개의 짧은 문단으로 친근하고 자연스러운 구어체(~해요, ~인 것 같아요, ~대단하네요)로 읽기 쉽게 줄바꿈을 넣어 작성하세요.
+3. 마지막 줄에는 "다들 이 소식 어떻게 생각하시나요? 댓글로 의견 들려주세요! 👇\n\n👉 더 자세한 심층 분석과 꿀팁은 첫 댓글 링크에 남겨둘게요!" 를 넣으세요.
+4. 마지막에 #스레드 #트렌드 #${trend.title.replace(/\s+/g, '')} 해시태그를 포함하세요.
+5. 절대로 영어 체크리스트, "Here is the text:", 프롬프트 설명 같은 잡담을 쓰지 말고 오직 한국어 게시글 본문만 출력하세요.`;
 
     // 유효한 최신 모델 우선순위
-    const candidateModels = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-1.5-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {
@@ -56,9 +61,10 @@ ${snippetContext}
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           let postContent = data.candidates[0].content.parts[0].text.trim();
 
-          // 생각 과정 태그나 불필요한 메타 라벨만 깔끔하게 제거 (본문 내용은 1글자도 건드리지 않음)
+          // 생각 과정 태그나 불필요한 메타 라벨만 깔끔하게 제거 (본문 내용은 온전하게 보존)
           postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
-          postContent = postContent.replace(/^(Hook|Body|Thought|Thinking|CTA):?\s*/gmi, "").trim();
+          postContent = postContent.replace(/^(Hook|Body|Thought|Thinking|CTA|Text directly outputted below):?\s*/gmi, "").trim();
+          postContent = postContent.replace(/^Here (is|are) [^\n]+:\s*/gmi, "").trim();
 
           return postContent;
         }

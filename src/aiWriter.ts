@@ -16,37 +16,19 @@ export class AiWriter {
    * 구글 트렌드 아이템을 바탕으로 매력적인 스레드 본문을 생성합니다.
    */
   async generatePost(trend: TrendItem): Promise<string> {
-    const prompt = `
-당신은 스레드(Threads)에서 수많은 '좋아요'와 댓글을 받는 인기 크리에이터입니다.
-아래 [실시간 핫이슈]를 바탕으로 사람들의 호기심과 공감을 이끄는 스레드 글을 작성해주세요.
+    const newsContext = trend.newsTitle ? `관련 기사: "${trend.newsTitle}"` : "";
+    const snippetContext = trend.snippet ? `내용: ${trend.snippet}` : "";
 
-[실시간 핫이슈]
-- 키워드: ${trend.title}
-- 관련 뉴스: ${trend.newsTitle || trend.title + " 관련 최신 화제 소식"}
-- 상세 요약: ${trend.snippet || "현재 실시간 검색어 및 대중들의 뜨거운 관심을 받고 있는 주요 이슈"}
+    const userPrompt = `주제: [${trend.title}]
+${newsContext}
+${snippetContext}
 
-[작성 예시 - 반드시 이 형식과 분량(300자 내외)으로 작성하세요]
-🔥 요즘 이 소식 때문에 인터넷 난리 났네요!
-
-${trend.title} 관련해서 새로운 소식이 전해졌는데요.
-처음엔 다들 설마 했는데, 실제 기사 내용을 보니까 진짜 분위기가 심상치 않더라고요.
-
-이게 앞으로 경제나 일상에 어떤 영향을 줄지 다들 주목하고 있는 상황입니다.
-과연 이번 이슈가 어떻게 마무리될지 궁금해지네요.
-
-여러분은 이번 소식 어떻게 보시나요? 댓글로 솔직한 생각 남겨주세요! 👇
-(👉 더 자세한 전체 분석 리포트와 꿀팁 링크는 첫 댓글에 남겨둘게요!)
-
-#트렌드 #${trend.title.replace(/\s+/g, "")} #실시간이슈
-
-[주의사항]
-- 절대 위의 '작성 예시'를 무시하고 1~2줄로 짧게 쓰지 마세요. 위 예시처럼 반드시 3~4개의 문단으로 내용을 채워주세요.
-- 본문에는 인터넷 주소(http...)를 넣지 마세요.
-- 오직 완성된 본문 텍스트만 바로 출력하세요.
-`;
+위 실시간 트렌드 주제로 한국 스레드(Threads)에 올릴 글을 재미있게 작성해줘.
+3~4개 문단으로 무슨 일인지 쉽게 설명하고, 마지막엔 사람들에게 생각을 묻는 질문과 함께 "👉 더 자세한 전체 분석 리포트랑 꿀팁은 첫 댓글에 남겨둘게요! 👇" 문구와 해시태그를 달아줘.
+영어 메모나 체크리스트 같은 것은 일절 쓰지 말고, 실제 올라갈 게시글 본문만 바로 출력해.`;
 
     // 유효한 최신 모델 우선순위
-    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-1.5-flash"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {
@@ -58,10 +40,13 @@ ${trend.title} 관련해서 새로운 소식이 전해졌는데요.
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            systemInstruction: {
+              parts: [{ text: "너는 대한민국 메타 스레드(Threads)의 인기 전문 인플루언서야. 일체의 잡담, 메모, 생각 과정, 영어 체크리스트를 배제하고 오직 바로 게시할 수 있는 고품질 한국어 스레드 본문 텍스트만을 출력한다." }]
+            },
+            contents: [{ parts: [{ text: userPrompt }] }],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 800,
+              maxOutputTokens: 1000,
             },
           }),
         });

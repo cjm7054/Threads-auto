@@ -39,32 +39,30 @@ export class ThreadsClient {
       return `mock_container_${Date.now()}`;
     }
 
-    const url = `${this.baseUrl}/${this.userId}/threads`;
-    const body = new URLSearchParams();
-    body.append("access_token", this.accessToken);
-    body.append("text", params.text);
+    const url = new URL(`${this.baseUrl}/${this.userId}/threads`);
+    url.searchParams.append("access_token", this.accessToken);
+    url.searchParams.append("text", params.text);
 
     if (params.imageUrl) {
-      body.append("media_type", "IMAGE");
-      body.append("image_url", params.imageUrl);
+      url.searchParams.append("media_type", "IMAGE");
+      url.searchParams.append("image_url", params.imageUrl);
     } else if (params.videoUrl) {
-      body.append("media_type", "VIDEO");
-      body.append("video_url", params.videoUrl);
+      url.searchParams.append("media_type", "VIDEO");
+      url.searchParams.append("video_url", params.videoUrl);
     } else {
-      body.append("media_type", "TEXT");
+      url.searchParams.append("media_type", "TEXT");
     }
 
     if (params.linkAttachment) {
-      body.append("link_attachment", params.linkAttachment);
+      url.searchParams.append("link_attachment", params.linkAttachment);
     }
 
     if (params.replyToId) {
-      body.append("reply_to_id", params.replyToId);
+      url.searchParams.append("reply_to_id", params.replyToId);
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       method: "POST",
-      body,
     });
 
     const data = await response.json() as { id?: string; error?: { message: string } };

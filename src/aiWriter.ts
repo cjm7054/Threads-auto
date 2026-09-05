@@ -72,9 +72,18 @@ export class AiWriter {
   }
 
   /**
-   * 첫 번째 대댓글(Reply)용 수익화/안내 멘트를 생성합니다.
+   * 첫 번째 대댓글(Reply)용 하이브리드 고수익 멘트 (블로그 애드센스 + 쿠팡 파트너스 + 공정위 문구)를 생성합니다.
    */
-  async generateReplyComment(trend: TrendItem, ctaConfig: { text: string; url: string }): Promise<string> {
-    return `${ctaConfig.text}\n\n👉 바로가기: ${ctaConfig.url}\n\n(유용한 실시간 이슈와 정보 자주 올리니 팔로우 부탁드려요! ✨)`;
+  async generateReplyComment(trend: TrendItem, mConfig: any): Promise<string> {
+    const blogText = mConfig.blog?.text || "📖 상세 분석 리포트 읽어보기 👇";
+    const blogUrl = mConfig.blog?.primaryUrl || "https://insightlab365.com/";
+
+    const coupangText = mConfig.affiliate?.text || "🛒 오늘의 실시간 한정 특가 모음 👇";
+    const coupangUrl = mConfig.affiliate?.url || "https://link.coupang.com/a/gNd017Dg4";
+    const disclaimer = mConfig.affiliate?.disclaimer || "※ 이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
+
+    const followMsg = mConfig.social?.followMessage || "✨ 유용한 실시간 이슈와 분석을 매일 올려드리니 팔로우 부탁드려요!";
+
+    return `📌 [인사이트랩365 추가 정보 안내]\n\n${blogText}\n👉 ${blogUrl}\n\n${coupangText}\n👉 ${coupangUrl}\n\n${disclaimer}\n\n${followMsg}`;
   }
 }

@@ -84,17 +84,13 @@ async function main() {
       // 2단계: 자동 첫 대댓글(Reply) 연쇄 발행 (수익 링크 / 프로필 유도)
       try {
         const monetizationConfigPath = resolve(process.cwd(), "config", "monetization.json");
-        let ctaConfig = {
-          text: "📌 더 많은 실시간 핫이슈 모음 & 유용한 정보는 아래 링크에서 확인하실 수 있습니다!",
-          url: "https://linktr.ee/your_profile"
-        };
+        let mConfig: any = {};
 
         if (existsSync(monetizationConfigPath)) {
-          const mConfig = JSON.parse(readFileSync(monetizationConfigPath, "utf-8"));
-          ctaConfig = mConfig.defaultCta || ctaConfig;
+          mConfig = JSON.parse(readFileSync(monetizationConfigPath, "utf-8"));
         }
 
-        const replyText = await aiWriter.generateReplyComment(selectedTrend, ctaConfig);
+        const replyText = await aiWriter.generateReplyComment(selectedTrend, mConfig);
         console.log(`💬 [2단계] 첫 번째 수익 대댓글 자동 작성 중... (Reply to: ${result.threadId})`);
         console.log("------------------------------------------");
         console.log("📝 대댓글 본문:\n" + replyText);

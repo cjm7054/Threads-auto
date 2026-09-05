@@ -41,8 +41,8 @@ export class AiWriter {
    - 오직 실제 스레드에 그대로 올라갈 '최종 완성 본문 텍스트' 단 하나만 출력하세요.
 `;
 
-    // 트래픽 폭주 시 자동 대체 모델 목록 (가장 안정적인 모델 순서)
-    const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.6-flash"];
+    // 유효한 최신 모델 우선순위
+    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {

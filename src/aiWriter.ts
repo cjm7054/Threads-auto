@@ -68,7 +68,12 @@ export class AiWriter {
       throw new Error(`Gemini AI 글 생성 실패: ${errorMsg}`);
     }
 
-    const postContent = data.candidates[0].content.parts[0].text.trim();
+    let postContent = data.candidates[0].content.parts[0].text.trim();
+
+    // 혹시라도 남아있을 수 있는 AI 생각 메모 / 체크리스트 패턴 코드 레벨에서 강제 제거
+    postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
+    postContent = postContent.replace(/^[\s\S]*?(?=[\uAC00-\uD7A3]|🔥|🚀|📢|💡|⚠️|📌)/i, "").trim();
+
     return postContent;
   }
 

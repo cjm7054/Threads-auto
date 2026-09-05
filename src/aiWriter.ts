@@ -7,7 +7,7 @@ export class AiWriter {
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model = "gemini-2.5-flash") {
+  constructor(apiKey: string, model = "gemini-3.6-flash") {
     this.apiKey = apiKey;
     this.model = model;
   }

@@ -3,6 +3,8 @@ import { QueueManager } from "./queueManager";
 import { TrendCollector } from "./trendCollector";
 import { AiWriter } from "./aiWriter";
 import { HistoryManager } from "./historyManager";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
 
 // Bun 및 최신 Node는 .env를 자동 로드하거나 기본 제공 기능을 사용합니다.
 if (typeof (process as any).loadEnvFile === "function") {
@@ -67,17 +69,57 @@ async function main() {
     }
 
     console.log("------------------------------------------");
-    console.log("📝 생성된 스레드 본문:\n" + generatedText);
+    console.log("📝 [1단계] 생성된 스레드 본문 (링크 없는 고도달 포스트):\n" + generatedText);
     console.log("------------------------------------------");
 
+    // 1단계: 본문 단독 포스팅 (외부 링크 제거 -> 알고리즘 도달률 극대화)
     const result = await client.post({
       text: generatedText,
-      linkAttachment: selectedTrend.newsUrl,
     });
 
-    if (result.success) {
+    if (result.success && result.threadId) {
       historyManager.addRecord(selectedTrend.title, result.threadId);
-      console.log(`🎉 [키워드: ${selectedTrend.title}] 실시간 트렌드 글이 성공적으로 포스팅되었습니다!`);
+      console.log(`🎉 [본문 발행 완료] (ID: ${result.threadId})`);
+
+      // 2단계: 자동 첫 대댓글(Reply) 연쇄 발행 (수익 링크 / 프로필 유도)
+      try {
+        const monetizationConfigPath = resolve(process.cwd(), "config", "monetization.json");
+        let ctaConfig = {
+          text: "📌 더 많은 실시간 핫이슈 모음 & 유용한 정보는 아래 링크에서 확인하실 수 있습니다!",
+          url: "https://linktr.ee/your_profile"
+        };
+
+        if (existsSync(monetizationConfigPath)) {
+          const mConfig = JSON.parse(readFileSync(monetizationConfigPath, "utf-8"));
+          ctaConfig = mConfig.defaultCta || ctaConfig;
+        }
+
+        const replyText = await aiWriter.generateReplyComment(selectedTrend, ctaConfig);
+        console.log(`💬 [2단계] 첫 번째 수익 대댓글 자동 작성 중... (Reply to: ${result.threadId})`);
+        console.log("------------------------------------------");
+        console.log("📝 대댓글 본문:\n" + replyText);
+        console.log("------------------------------------------");
+
+        // Threads API 딜레이 (안정적인 쓰레드 체이닝을 위해 2초 대기)
+        if (!isDryRun) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+
+        const replyResult = await client.post({
+          text: replyText,
+          replyToId: result.threadId,
+        });
+
+        if (replyResult.success) {
+          console.log(`🚀 [수익 대댓글 발행 성공!] (Reply ID: ${replyResult.threadId})`);
+        } else {
+          console.warn(`⚠️ 대댓글 발행 실패 (본문은 정상 게시됨): ${replyResult.error}`);
+        }
+      } catch (replyErr: any) {
+        console.warn(`⚠️ 대댓글 생성 중 예외 발생 (본문은 정상 게시됨):`, replyErr.message || replyErr);
+      }
+
+      console.log(`✨ [키워드: ${selectedTrend.title}] 하이브리드 자동 포스팅 파이프라인 완료!`);
     } else {
       console.error(`❌ 포스팅 실패: ${result.error}`);
       process.exit(1);

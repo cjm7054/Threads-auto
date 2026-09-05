@@ -1,0 +1,22 @@
+{
+  "defaultCta": {
+    "text": "📌 더 많은 실시간 핫이슈 모음 & 유용한 정보는 아래 링크에서 확인하실 수 있습니다!",
+    "url": "https://linktr.ee/your_profile"
+  },
+  "affiliateLinks": [
+    {
+      "category": "default",
+      "text": "💡 관련 추천 꿀템 & 실시간 특가 모음 보기 👇",
+      "url": "https://link.coupang.com/a/example"
+    },
+    {
+      "category": "tech",
+      "text": "⚡ 가성비 전자기기 & 최신 테크 핫딜 특가 바로가기 👇",
+      "url": "https://link.coupang.com/a/example_tech"
+    }
+  ],
+  "blogCta": {
+    "text": "📖 이슈 전체 맥락 & 상세 정리 리포트 읽어보기 👇",
+    "url": "https://yourblog.tistory.com"
+  }
+}

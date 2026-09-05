@@ -82,11 +82,18 @@ async function main() {
       console.log(`🖼️ [AI 이미지 준비 완료] ${postImageUrl}`);
     }
 
-    // 1단계: 본문 + 이미지 포스팅 (알고리즘 도달률 및 피드 주목도 극대화)
-    const result = await client.post({
+    // 1단계: 본문 + 이미지 포스팅 (이미지 URL이 Meta 서버에서 거부될 경우 즉시 텍스트 단독으로 자동 재시도)
+    let result = await client.post({
       text: generatedText,
       imageUrl: postImageUrl,
     });
+
+    if (!result.success && postImageUrl) {
+      console.warn(`⚠️ [이미지 컨테이너 실패] 외부 이미지 URL 접근 문제로 텍스트 단독 포스팅으로 자동 전환합니다... (${result.error})`);
+      result = await client.post({
+        text: generatedText,
+      });
+    }
 
     if (result.success && result.threadId) {
       historyManager.addRecord(selectedTrend.title, result.threadId);

@@ -3,6 +3,7 @@ import { QueueManager } from "./queueManager";
 import { TrendCollector } from "./trendCollector";
 import { AiWriter } from "./aiWriter";
 import { HistoryManager } from "./historyManager";
+import { WordPressClient } from "./wordPressClient";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
@@ -20,6 +21,9 @@ async function main() {
   const userId = process.env.THREADS_USER_ID || "me";
   const accessToken = process.env.THREADS_ACCESS_TOKEN || "";
   const geminiKey = process.env.GEMINI_API_KEY || "";
+  const wpUrl = process.env.WP_URL || "https://insightlab365.com";
+  const wpUsername = process.env.WP_USERNAME || "cjm7054";
+  const wpAppPassword = process.env.WP_APP_PASSWORD || "SfyM z8qe CGnT LOzO CA7X 8AtP";
 
   if (!isDryRun && !accessToken) {
     console.error("❌ 에러: THREADS_ACCESS_TOKEN 환경 변수가 설정되지 않았습니다.");
@@ -99,7 +103,7 @@ async function main() {
       historyManager.addRecord(selectedTrend.title, result.threadId);
       console.log(`🎉 [본문 발행 완료] (ID: ${result.threadId})`);
 
-      // 2단계: 자동 첫 대댓글(Reply) 연쇄 발행 (수익 링크 / 프로필 유도)
+      // 2단계: 워드프레스 블로그 실제 상세글 자동 발행 & 첫 대댓글(Reply) 연쇄 발행
       try {
         const monetizationConfigPath = resolve(process.cwd(), "config", "monetization.json");
         let mConfig: any = {};
@@ -108,7 +112,26 @@ async function main() {
           mConfig = JSON.parse(readFileSync(monetizationConfigPath, "utf-8"));
         }
 
-        const replyText = await aiWriter.generateReplyComment(selectedTrend, mConfig);
+        let actualWpUrl: string | undefined = undefined;
+
+        // 워드프레스에 실제 1,500자 상세 분석 아티클 자동 포스팅
+        if (wpUsername && wpAppPassword) {
+          console.log(`📝 [워드프레스] "${selectedTrend.title}" 주제로 블로그 상세 리포트 생성 중...`);
+          try {
+            const wpArticle = await aiWriter.generateWordPressArticle(selectedTrend);
+            const wpClient = new WordPressClient(wpUrl, wpUsername, wpAppPassword);
+            const wpResult = await wpClient.createPost(wpArticle.title, wpArticle.html);
+
+            if (wpResult.success && wpResult.postUrl) {
+              actualWpUrl = wpResult.postUrl;
+              console.log(`🌐 [워드프레스 실제 글 발행 성공!] ${actualWpUrl}`);
+            }
+          } catch (wpErr: any) {
+            console.warn(`⚠️ 워드프레스 자동 발행 실패 (기본 메인 링크로 대체):`, wpErr.message || wpErr);
+          }
+        }
+
+        const replyText = await aiWriter.generateReplyComment(selectedTrend, mConfig, actualWpUrl);
         console.log(`💬 [2단계] 첫 번째 수익 대댓글 자동 작성 중... (Reply to: ${result.threadId})`);
         console.log("------------------------------------------");
         console.log("📝 대댓글 본문:\n" + replyText);

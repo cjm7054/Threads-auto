@@ -86,13 +86,14 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 
   /**
    * 첫 번째 대댓글(Reply)용 하이브리드 고수익 멘트 (블로그 애드센스 + 쿠팡 파트너스 + 공정위 문구)를 생성합니다.
+   * 실제 워드프레스에 발행된 글의 URL이 전달되면 그 링크를 우선 적용합니다.
    */
-  async generateReplyComment(trend: TrendItem, mConfig: any): Promise<string> {
-    const blogText = mConfig.blog?.text || "📖 상세 분석 리포트 읽어보기 👇";
-    const blogUrl = mConfig.blog?.primaryUrl || "https://insightlab365.com/";
+  async generateReplyComment(trend: TrendItem, mConfig: any, actualPostUrl?: string): Promise<string> {
+    const blogText = mConfig.blog?.text || "📖 이슈의 전체 맥락과 상세 분석 리포트 읽어보기 👇";
+    const blogUrl = actualPostUrl || mConfig.blog?.primaryUrl || "https://insightlab365.com/";
 
-    const coupangText = mConfig.affiliate?.text || "🛒 오늘의 실시간 한정 특가 모음 👇";
-    const coupangUrl = mConfig.affiliate?.url || "https://link.coupang.com/a/gNd017Dg4";
+    const coupangText = mConfig.affiliate?.text || "🛒 오늘의 실시간 골든박스 & 한정 특가 모음 바로가기 👇";
+    const coupangUrl = mConfig.affiliate?.url || "https://link.coupang.com/a/gNd0L7Og4i";
     const disclaimer = mConfig.affiliate?.disclaimer || "※ 이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.";
 
     const followMsg = mConfig.social?.followMessage || "✨ 유용한 실시간 이슈와 분석을 매일 올려드리니 팔로우 부탁드려요!";
@@ -139,5 +140,64 @@ Do not include quotation marks, style jargon, or explanations. Output ONLY the p
       const safeTitle = encodeURIComponent(trend.title);
       return `https://image.pollinations.ai/prompt/breaking%20news%20concept%20${safeTitle}?width=1080&height=1080&nologo=true`;
     }
+  }
+
+  /**
+   * 워드프레스 블로그용 고품질 심층 분석 기사(HTML 형식, 약 1,500자 내외)를 생성합니다.
+   * 구글 애드센스 승인 및 체류시간 극대화에 최적화된 구조로 작성됩니다.
+   */
+  async generateWordPressArticle(trend: TrendItem): Promise<{ title: string; html: string }> {
+    const prompt = `대한민국 실시간 이슈 [${trend.title}]에 대한 블로그용 고품질 심층 분석 리포트를 작성해줘.
+관련 뉴스: "${trend.newsTitle || ''}"
+요약 내용: "${trend.snippet || ''}"
+
+[작성 가이드라인]
+1. 제목은 검색 유입과 호기심을 자극하는 매력적인 제목으로 1개 작성 (예: [이슈 분석] ~한 이유와 향후 전망 정리).
+2. 본문은 네이버/구글 검색엔진 최적화(SEO)를 고려하여 소제목(<h2>, <h3>)과 문단(<p>), 글머리 기호(<ul>, <li>)가 포함된 깔끔한 HTML 태그 형태로 작성.
+3. 구성 순서:
+   - 도입부: 사건/이슈의 배경과 핵심 팩트 정리
+   - 본론 1: 대중들의 반응과 주요 쟁점 분석
+   - 본론 2: 전문가 의견 및 향후 사회적/경제적 파급 효과
+   - 결론: 요약 및 시사점, 독자의 생각을 묻는 마무리
+4. 전체 분량은 약 1,000자~1,500자 정도로 풍부하고 신뢰감 있는 문체(~합니다, ~입니다)로 작성.
+5. <html>, <body>, <h1> 태그나 코드블럭 따옴표(\`\`\`html)는 일절 쓰지 말고, 오직 바로 워드프레스 본문에 들어갈 본문 HTML만 출력해.
+첫 번째 줄에는 반드시 "TITLE: [제목 내용]" 형식으로 제목을 명시하고, 한 줄 띄운 뒤 본문 HTML을 출력할 것.`;
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 2500, temperature: 0.7 },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json() as any;
+        const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+        const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/m);
+        const articleTitle = titleMatch ? titleMatch[1].trim() : `[이슈 분석] ${trend.title} - 핵심 내용과 주요 쟁점 정리`;
+        const htmlContent = rawOutput.replace(/^TITLE:\s*.+\n*/m, "").replace(/```html|```/g, "").trim();
+
+        return { title: articleTitle, html: htmlContent };
+      }
+    } catch (e) {
+      console.warn("⚠️ Gemini 블로그 글 생성 실패, 기본 템플릿 대체:", e);
+    }
+
+    const fallbackTitle = `[실시간 트렌드] ${trend.title} 관련 주요 소식 및 전체 분석`;
+    const fallbackHtml = `
+<h2>1. ${trend.title} 이슈 개요</h2>
+<p>최근 실시간 검색어 및 주요 언론을 통해 <strong>${trend.title}</strong> 관련 소식이 전해지며 많은 사람들의 관심이 쏟아지고 있습니다.</p>
+${trend.newsTitle ? `<p>주요 보도 내용에 따르면 "${trend.newsTitle}" 소식이 중심이 되어 온·오프라인에서 다양한 반응이 이어지고 있습니다.</p>` : ''}
+<h2>2. 대중의 반응과 핵심 쟁점</h2>
+<p>${trend.snippet || '현재 해당 사안을 두고 여러 커뮤니티와 SNS에서 다양한 관점의 논의가 활발히 전개되고 있는 상황입니다.'}</p>
+<h2>3. 향후 전망 및 정리</h2>
+<p>앞으로 추가적인 공식 발표나 전개 상황에 따라 새로운 사실이 확인될 것으로 보이며, 지속적인 관심이 필요해 보입니다.</p>
+`;
+    return { title: fallbackTitle, html: fallbackHtml };
   }
 }

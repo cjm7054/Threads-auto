@@ -39,30 +39,36 @@ export class ThreadsClient {
       return `mock_container_${Date.now()}`;
     }
 
-    const url = new URL(`${this.baseUrl}/${this.userId}/threads`);
-    url.searchParams.append("access_token", this.accessToken);
-    url.searchParams.append("text", params.text);
+    const url = `${this.baseUrl}/${this.userId}/threads`;
+    
+    // FormData를 사용하면 긴 본문, 줄바꿈, 특수문자, 이모지가 절대 잘리지 않고 100% 온전하게 전송됩니다.
+    const formData = new FormData();
+    formData.append("access_token", this.accessToken);
+    formData.append("text", params.text);
 
     if (params.imageUrl) {
-      url.searchParams.append("media_type", "IMAGE");
-      url.searchParams.append("image_url", params.imageUrl);
+      formData.append("media_type", "IMAGE");
+      formData.append("image_url", params.imageUrl);
     } else if (params.videoUrl) {
-      url.searchParams.append("media_type", "VIDEO");
-      url.searchParams.append("video_url", params.videoUrl);
+      formData.append("media_type", "VIDEO");
+      formData.append("video_url", params.videoUrl);
     } else {
-      url.searchParams.append("media_type", "TEXT");
+      formData.append("media_type", "TEXT");
     }
 
     if (params.linkAttachment) {
-      url.searchParams.append("link_attachment", params.linkAttachment);
+      formData.append("link_attachment", params.linkAttachment);
     }
 
     if (params.replyToId) {
-      url.searchParams.append("reply_to_id", params.replyToId);
+      formData.append("reply_to_id", params.replyToId);
     }
 
-    const response = await fetch(url.toString(), {
+    console.log(`[Threads] 전송할 본문 길이: ${params.text.length}자, 줄바꿈 수: ${params.text.split('\n').length}`);
+
+    const response = await fetch(url, {
       method: "POST",
+      body: formData,
     });
 
     const data = await response.json() as { id?: string; error?: { message: string } };

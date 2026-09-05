@@ -6,6 +6,7 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "post": "bun run src/index.ts --post-next",
+    "trend-post": "bun run src/index.ts --trend-auto",
     "dry-run": "bun run src/index.ts --dry-run"
   },
   "dependencies": {

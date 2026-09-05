@@ -1,18 +1,23 @@
-# 🧵 Threads(스레드) 자동 포스팅 시스템 with GitHub Actions
+# 🧵 실시간 트렌드 AI 자동 포스팅 시스템 with Threads & GitHub Actions
 
-Meta 공식 Threads Graph API와 GitHub Actions를 활용하여 정해진 스케줄이나 이벤트에 맞춰 스레드에 글을 자동으로 포스팅하는 시스템입니다.
+구글 트렌드(Google Trends)의 **대한민국 실시간 급상승 검색어 및 관련 뉴스**를 자동으로 가져와, **Google Gemini AI (`gemini-2.5-flash`)**가 스레드에 어울리는 매력적인 게시글을 작성하고 Meta 공식 Threads API로 자동 발행하는 시스템입니다.
 
 ---
 
 ## 🌟 주요 기능
 
-- **공식 Threads Graph API 활용**: 비공식 스크래핑/봇 방식이 아닌 공식 Graph API(`graph.threads.net`)를 사용하여 계정 제재 및 차단 위험이 없습니다.
-- **큐 기반 포스팅 관리 (`content/queue.json`)**: 포스팅할 글 목록을 JSON 파일에 적어두기만 하면, 워크플로우가 대기(`pending`) 중인 글을 찾아 순서대로 업로드합니다.
-- **GitHub Actions 연동**:
-  - **정기 발행(Cron)**: 매일 지정된 시각에 자동 실행
-  - **수동 즉시 발행(workflow_dispatch)**: 깃허브 웹 페이지에서 버튼 클릭 한 번으로 즉시 발행 가능
-  - **자동 상태 갱신**: 포스팅 완료 시 발행 완료(`published`) 상태와 발행 일시, Thread ID를 깃허브 저장소에 자동 커밋 & 푸시
-- **시뮬레이션 모드(DRY-RUN)**: 실제 API 호출 없이 로컬 또는 CI에서 큐 관리 및 상태 업데이트 로직을 안전하게 테스트할 수 있습니다.
+1. **실시간 트렌드 수집**:
+   - 대한민국 구글 트렌드 실시간 검색어, 관련 기사 헤드라인 및 링크 자동 추출
+2. **Google Gemini AI 자동 본문 작성**:
+   - 스레드(Threads) 특유의 친근한 대화체, 흥미를 끄는 첫 문장(후킹), 이모지, 깔끔한 줄바꿈, 댓글 유도 질문, 해시태그 자동 작성
+   - 최신 초경량 고성능 모델 `gemini-2.5-flash` 사용 (무료 할당량으로 충분히 운영 가능)
+3. **중복 포스팅 방지 시스템 (`content/published_history.json`)**:
+   - 최근 7일 이내에 이미 포스팅한 키워드는 자동으로 건너뛰고 다음 인기 키워드를 선정
+4. **GitHub Actions 스케줄링**:
+   - 매일 **오전 9시, 오후 1시, 오후 7시** (한국 시간 기준) 정기 자동 발행
+   - `Actions` 탭에서 언제든지 수동 즉시 실행 가능 (`trend` 모드 또는 `queue` 모드 선택 지원)
+5. **수동 큐(`queue.json`) 백업 지원**:
+   - 내가 직접 적어둔 글을 올리고 싶을 땐 `content/queue.json`을 통한 포스팅도 가능
 
 ---
 
@@ -21,88 +26,47 @@ Meta 공식 Threads Graph API와 GitHub Actions를 활용하여 정해진 스케
 ```text
 ├── .github/
 │   └── workflows/
-│       └── auto-publish.yml    # GitHub Actions 자동 발행 워크플로우
+│       └── auto-publish.yml        # GitHub Actions 스케줄러 (트렌드 AI 발행)
 ├── content/
-│   └── queue.json              # 포스팅 대기/완료 콘텐츠 큐
+│   ├── queue.json                  # 수동 작성 대기 큐
+│   └── published_history.json      # 발행 완료된 트렌드 키워드 히스토리
 ├── src/
-│   ├── index.ts                # CLI 실행 엔트리포인트
-│   ├── queueManager.ts         # 큐(queue.json) 로드 및 상태 업데이트 관리자
-│   └── threadsClient.ts        # Meta Threads Graph API 통신 클라이언트
-├── .env.example                # 환경 변수 템플릿
+│   ├── index.ts                    # 메인 실행 엔트리포인트
+│   ├── trendCollector.ts           # 구글 실시간 트렌드 RSS 수집 모듈
+│   ├── aiWriter.ts                 # Google Gemini 2.5 Flash 스레드 글 작성 모듈
+│   ├── historyManager.ts           # 중복 포스팅 방지 히스토리 관리자
+│   ├── queueManager.ts             # 큐 관리자
+│   └── threadsClient.ts            # Meta 공식 Threads Graph API 클라이언트
+├── .env.example
 ├── package.json
 └── README.md
 ```
 
 ---
 
-## 🔑 1. Meta Threads API 자격 증명 발급 방법
+## 🔑 GitHub Secrets 등록 가이드 (3개 필요)
 
-1. **[Meta for Developers](https://developers.facebook.com/)** 접속 및 로그인
-2. **앱 만들기**: 유형으로 `Business` 또는 `Other` 선택 후 **Threads API** 제품 추가
-3. **권한 승인**: `threads_content_publish`, `threads_basic` 권한 설정
-4. **액세스 토큰 생성**:
-   - Graph API Explorer 또는 앱 대시보드에서 단기 토큰 발급 후 장기 유효 토큰(Long-Lived Token, 유효기간 60일)으로 교환
-5. 발급된 **계정 ID (`THREADS_USER_ID`)** 및 **토큰 (`THREADS_ACCESS_TOKEN`)** 확보
+깃허브 저장소 **Settings ➔ Secrets and variables ➔ Actions** 에 다음 3개의 시크릿을 등록합니다:
 
----
+| 시크릿 이름 | 설명 | 발급처 |
+| :--- | :--- | :--- |
+| `THREADS_USER_ID` | 내 Threads 계정 고유 ID | Meta Graph API (`/v1.0/me`) |
+| `THREADS_ACCESS_TOKEN` | Threads 60일 장기 액세스 토큰 | Meta Developers (사용자 토큰 생성기) |
+| **`GEMINI_API_KEY`** | **Google Gemini 무료 API 키** | **[Google AI Studio](https://aistudio.google.com/app/apikey)** |
 
-## ⚙️ 2. GitHub 저장소 Secrets 등록
-
-본 프로젝트를 내 깃허브 저장소로 푸시한 후, 아래 설정을 진행합니다:
-
-1. 깃허브 레포지토리의 **Settings** 탭 이동
-2. 좌측 메뉴에서 **Secrets and variables** > **Actions** 클릭
-3. **New repository secret** 버튼 클릭 후 다음 2개 등록:
-   - `THREADS_USER_ID`: 내 Threads 계정 고유 ID
-   - `THREADS_ACCESS_TOKEN`: Threads 장기 액세스 토큰
+### 💡 Google Gemini API Key 무료 발급 방법 (1분 소요)
+1. **[Google AI Studio](https://aistudio.google.com/app/apikey)** 에 접속하여 구글 계정으로 로그인합니다.
+2. 파란색 **[Create API key]** 버튼을 클릭합니다.
+3. 생성된 키를 복사하여 깃허브 시크릿에 `GEMINI_API_KEY` 로 등록하면 끝입니다!
 
 ---
 
-## 📝 3. 포스팅할 글 등록하는 법 (`content/queue.json`)
-
-`content/queue.json` 파일에 발행할 글 객체를 추가합니다:
-
-```json
-[
-  {
-    "id": "post-001",
-    "text": "안녕하세요! 첫 번째 자동 포스팅입니다. 🚀 #Threads #개발",
-    "status": "pending"
-  },
-  {
-    "id": "post-002",
-    "text": "이미지도 함께 첨부할 수 있습니다!",
-    "imageUrl": "https://example.com/image.jpg",
-    "status": "pending"
-  }
-]
-```
-
-- `status`가 `"pending"`인 항목 중 가장 첫 번째 항목이 다음 포스팅 대상이 됩니다.
-- 발행이 완료되면 깃허브 봇이 자동으로 `status: "published"` 및 `publishedAt`, `threadId`를 업데이트하여 커밋합니다.
-
----
-
-## 💻 4. 로컬 테스트 및 시뮬레이션 실행
+## 💻 로컬 테스트 방법
 
 ```bash
-# 1. 시뮬레이션(Dry-Run) 테스트 (API 키 없이도 동작 확인 가능)
-bun run dry-run
+# 1. 실시간 트렌드 수집 및 AI 작성 시뮬레이션 (API 키 없이도 목업 본문으로 테스트 가능)
+bun run src/index.ts --trend-auto --dry-run
 
-# 2. 실제 토큰 설정 후 로컬에서 직접 발행
-# .env 파일 생성 후 THREADS_USER_ID, THREADS_ACCESS_TOKEN 입력
-bun run post
-```
-
----
-
-## ⏰ 5. GitHub Actions 스케줄 변경
-
-`.github/workflows/auto-publish.yml` 파일에서 크론 표현식을 수정하여 발행 시간을 변경할 수 있습니다:
-
-```yaml
-on:
-  schedule:
-    # 매일 한국 시각 오전 9시 (UTC 00:00)
-    - cron: '0 0 * * *'
+# 2. 실제 토큰 및 Gemini 키로 로컬에서 직접 1회 포스팅
+bun run trend-post
 ```

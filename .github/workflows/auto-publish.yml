@@ -2,12 +2,21 @@ name: Auto Post to Threads
 
 on:
   schedule:
-    # 매일 한국 시간 기준 오전 9시 (UTC 00:00) 에 자동 실행
-    - cron: '0 0 * * *'
-  workflow_dispatch: # 깃허브 웹 콘솔에서 'Run workflow' 버튼으로 수동 즉시 실행 가능
+    # 한국 시간 기준 오전 9시, 오후 1시, 오후 7시에 자동 실행 (UTC 00:00, 04:00, 10:00)
+    - cron: '0 0,4,10 * * *'
+  workflow_dispatch: # 수동 즉시 실행 지원
+    inputs:
+      mode:
+        description: '포스팅 모드 선택'
+        required: true
+        default: 'trend'
+        type: choice
+        options:
+          - trend   # 구글 실시간 트렌드 AI 자동 생성 글 포스팅
+          - queue   # content/queue.json의 대기 글 포스팅
 
 permissions:
-  contents: write # 큐 파일 업데이트 후 Git 커밋 & 푸시 권한
+  contents: write # 발행 히스토리 및 큐 업데이트 후 Git 자동 푸시 권한
 
 jobs:
   post:
@@ -24,16 +33,26 @@ jobs:
       - name: 의존성 패키지 설치
         run: bun install
 
-      - name: 대기 중인 스레드 자동 포스팅 실행
+      - name: 실시간 트렌드 AI 자동 포스팅 실행
+        if: "${{ github.event_name == 'schedule' || inputs.mode == 'trend' }}"
+        env:
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DRY_RUN: ${{ vars.DRY_RUN || 'false' }}
+        run: bun run trend-post
+
+      - name: 수동 큐(queue.json) 포스팅 실행
+        if: "${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'queue' }}"
         env:
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           DRY_RUN: ${{ vars.DRY_RUN || 'false' }}
         run: bun run post
 
-      - name: 큐 상태 업데이트 커밋 및 푸시
+      - name: 발행 기록 및 큐 상태 커밋 & 푸시
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add content/queue.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update threads queue status [skip ci]" && git push)
+          git add content/queue.json content/published_history.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update post queue & trend history [skip ci]" && git push)

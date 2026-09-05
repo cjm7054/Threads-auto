@@ -1,0 +1,71 @@
+/**
+ * 실시간 대한민국 구글 트렌드(Google Trends) 수집 모듈
+ */
+
+export interface TrendItem {
+  title: string;
+  approxTraffic?: string;
+  newsTitle?: string;
+  newsUrl?: string;
+  snippet?: string;
+}
+
+export class TrendCollector {
+  private rssUrl = "https://trends.google.com/trending/rss?geo=KR";
+
+  /**
+   * 구글 트렌드 RSS 피드를 파싱하여 최신 트렌드 리스트를 가져옵니다.
+   */
+  async fetchTrends(): Promise<TrendItem[]> {
+    const response = await fetch(this.rssUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`구글 트렌드 RSS 수집 실패: ${response.statusText} (${response.status})`);
+    }
+
+    const xml = await response.text();
+    return this.parseRss(xml);
+  }
+
+  private parseRss(xml: string): TrendItem[] {
+    const items: TrendItem[] = [];
+    const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+
+    for (const rawItem of itemMatches) {
+      const titleMatch = rawItem.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || rawItem.match(/<title>(.*?)<\/title>/);
+      const title = titleMatch ? titleMatch[1].trim() : "";
+
+      if (!title) continue;
+
+      const trafficMatch = rawItem.match(/<ht:approx_traffic>(.*?)<\/ht:approx_traffic>/);
+      const approxTraffic = trafficMatch ? trafficMatch[1].trim() : undefined;
+
+      const newsTitleMatch = rawItem.match(/<ht:news_item_title><!\[CDATA\[(.*?)\]\]><\/ht:news_item_title>/) ||
+                             rawItem.match(/<ht:news_item_title>(.*?)<\/ht:news_item_title>/);
+      const newsTitle = newsTitleMatch ? newsTitleMatch[1].trim() : undefined;
+
+      const newsUrlMatch = rawItem.match(/<ht:news_item_url><!\[CDATA\[(.*?)\]\]><\/ht:news_item_url>/) ||
+                           rawItem.match(/<ht:news_item_url>(.*?)<\/ht:news_item_url>/);
+      const newsUrl = newsUrlMatch ? newsUrlMatch[1].trim() : undefined;
+
+      const snippetMatch = rawItem.match(/<ht:news_item_snippet><!\[CDATA\[(.*?)\]\]><\/ht:news_item_snippet>/) ||
+                           rawItem.match(/<ht:news_item_snippet>(.*?)<\/ht:news_item_snippet>/);
+      const snippet = snippetMatch ? snippetMatch[1].trim() : undefined;
+
+      items.push({
+        title,
+        approxTraffic,
+        newsTitle,
+        newsUrl,
+        snippet,
+      });
+    }
+
+    return items;
+  }
+}

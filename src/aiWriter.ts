@@ -32,8 +32,8 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 4. 마지막에 #스레드 #트렌드 #${trend.title.replace(/\s+/g, '')} 해시태그를 포함하세요.
 5. 절대로 영어 체크리스트, "Here is the text:", 프롬프트 설명 같은 잡담을 쓰지 말고 오직 한국어 게시글 본문만 출력하세요.`;
 
-    // 유효한 최신 모델 우선순위
-    const candidateModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+    // Google Gemini API 최신 정식 지원 모델 우선순위
+    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {
@@ -106,7 +106,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 Generate a single short English prompt (under 15 words) for an image generator (like Midjourney or DALL-E) to create an editorial photo or high-quality illustration representing this news topic. 
 Do not include quotation marks, style jargon, or explanations. Output ONLY the prompt text in English.`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${this.apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

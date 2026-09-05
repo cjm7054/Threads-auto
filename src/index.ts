@@ -96,10 +96,10 @@ async function main() {
         console.log("📝 대댓글 본문:\n" + replyText);
         console.log("------------------------------------------");
 
-        // Threads API 딜레이 (본문이 서버에 완전히 등록되어 reply_to_id 조회가 가능할 때까지 5초 대기)
+        // Threads API 딜레이 (본문이 서버에 완전히 등록되어 reply_to_id 조회가 가능할 때까지 8초 대기)
         if (!isDryRun) {
-          console.log("⏳ 본문 인덱싱 대기 중 (5초)...");
-          await new Promise((r) => setTimeout(r, 5000));
+          console.log("⏳ 본문 인덱싱 대기 중 (8초)...");
+          await new Promise((r) => setTimeout(r, 8000));
         }
 
         const replyResult = await client.post({

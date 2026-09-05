@@ -67,9 +67,10 @@ export class AiWriter {
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           let postContent = data.candidates[0].content.parts[0].text.trim();
 
-          // 혹시라도 남아있을 수 있는 AI 생각 메모 / 체크리스트 패턴 코드 레벨에서 강제 제거
-          postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
-          postContent = postContent.replace(/^[\s\S]*?(?=[\uAC00-\uD7A3]|🔥|🚀|📢|💡|⚠️|📌)/i, "").trim();
+          // AI 생각 과정이나 Checklist 태그만 안전하게 제거
+          postContent = postContent.replace(/\*?\*?\[?Checklist[\s\S]*?\*?\*?\n*/gi, "").trim();
+          postContent = postContent.replace(/\*?\*?Character Count[\s\S]*?\n*/gi, "").trim();
+          postContent = postContent.replace(/^(Hook|Body|Thought|Thinking):?\s*/gmi, "").trim();
 
           return postContent;
         }

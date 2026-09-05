@@ -9,6 +9,8 @@
   {
     "id": "post-002",
     "text": "💡 깃허브 레포지토리의 queue.json에 글을 적어두기만 하면 매일 정해진 시간에 자동으로 스레드에 업로드됩니다.",
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-09-05T06:43:27.594Z",
+    "threadId": "18123531640845441"
   }
 ]

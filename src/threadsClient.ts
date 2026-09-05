@@ -42,13 +42,18 @@ export class ThreadsClient {
     const url = `${this.baseUrl}/${this.userId}/threads`;
     
     // FormData를 사용하면 긴 본문, 줄바꿈, 특수문자, 이모지가 절대 잘리지 않고 100% 온전하게 전송됩니다.
+    // Meta Threads API는 media_type=IMAGE일 때 쿼리 스트링 또는 URLSearchParams/FormData의 image_url을 필요로 함
     const formData = new FormData();
     formData.append("access_token", this.accessToken);
     formData.append("text", params.text);
 
+    let requestUrl = url;
     if (params.imageUrl) {
       formData.append("media_type", "IMAGE");
       formData.append("image_url", params.imageUrl);
+      const encUrl = encodeURIComponent(params.imageUrl);
+      requestUrl = `${url}?media_type=IMAGE&image_url=${encUrl}`;
+      console.log(`[Threads] 이미지 첨부 컨테이너 생성: ${params.imageUrl}`);
     } else if (params.videoUrl) {
       formData.append("media_type", "VIDEO");
       formData.append("video_url", params.videoUrl);
@@ -66,14 +71,15 @@ export class ThreadsClient {
 
     console.log(`[Threads] 전송할 본문 길이: ${params.text.length}자, 줄바꿈 수: ${params.text.split('\n').length}`);
 
-    const response = await fetch(url, {
+    const response = await fetch(requestUrl, {
       method: "POST",
       body: formData,
     });
 
-    const data = await response.json() as { id?: string; error?: { message: string } };
+    const data = await response.json() as any;
 
     if (!response.ok || !data.id) {
+      console.error("[Threads API 에러 상세 응답]", JSON.stringify(data));
       throw new Error(`Threads 컨테이너 생성 실패: ${data.error?.message || response.statusText}`);
     }
 
@@ -134,9 +140,11 @@ export class ThreadsClient {
    * 원클릭 전체 포스팅 프로세스
    */
   async post(params: CreatePostParams): Promise<PublishResult> {
+    let lastCreationId: string | undefined = undefined;
     try {
       console.log(`[Threads] 포스트 컨테이너 생성 중...`);
       const creationId = await this.createContainer(params);
+      lastCreationId = creationId;
 
       // 미디어가 있는 경우 상태 체크
       if (params.imageUrl || params.videoUrl) {
@@ -144,7 +152,7 @@ export class ThreadsClient {
         await this.waitForContainer(creationId);
       }
 
-      console.log(`[Threads] 최종 포스트 발행 중...`);
+      console.log(`[Threads] 최종 포스트 발행 중... (컨테이너: ${creationId})`);
       const threadId = await this.publishContainer(creationId);
       console.log(`✅ [Threads] 발행 성공! (ID: ${threadId})`);
 
@@ -157,6 +165,7 @@ export class ThreadsClient {
       console.error(`❌ [Threads] 포스팅 실패:`, err.message || err);
       return {
         success: false,
+        creationId: lastCreationId,
         error: err.message || String(err),
       };
     }

@@ -61,12 +61,16 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           let postContent = data.candidates[0].content.parts[0].text.trim();
 
-          // 생각 과정 태그나 불필요한 메타 라벨만 깔끔하게 제거 (본문 내용은 온전하게 보존)
+          // 생각 과정 태그나 불필요한 메타 라벨만 깔끔하게 제거
           postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
           postContent = postContent.replace(/^(Hook|Body|Thought|Thinking|CTA|Text directly outputted below):?\s*/gmi, "").trim();
           postContent = postContent.replace(/^Here (is|are) [^\n]+:\s*/gmi, "").trim();
 
-          return postContent;
+          // 최소 본문 길이(80자)를 충족할 때만 정상 반환
+          if (postContent.length >= 80) {
+            return postContent;
+          }
+          console.warn(`⚠️ [${currentModel}] 생성된 본문이 너무 짧습니다 (${postContent.length}자). 다음 모델로 재시도합니다.`);
         }
 
         lastError = data.error?.message || response.statusText;
@@ -76,7 +80,8 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
       }
     }
 
-    throw new Error(`모든 Gemini 모델 호출 실패: ${lastError}`);
+    console.warn(`⚠️ Gemini API 응답 제한으로 트렌드 기반 맞춤 템플릿으로 본문을 구성합니다: ${lastError}`);
+    return `🔥 지금 실시간으로 가장 뜨거운 화제의 이슈: [${trend.title}]!\n\n${trend.newsTitle ? '최근 보도에 따르면 "' + trend.newsTitle + '" 소식이 전해지며 많은 사람들의 관심이 집중되고 있습니다.' : '관련 소식이 전해지며 다양한 의견과 반응이 쏟아지고 있는 상황인데요.'}\n\n${trend.snippet || '과연 앞으로 어떤 방향으로 전개될지 귀추가 주목됩니다.'}\n\n다들 이 소식 어떻게 생각하시나요? 댓글로 여러분의 생각을 들려주세요! 👇\n\n👉 더 자세한 심층 분석 리포트와 꿀팁은 첫 댓글 링크에 남겨둘게요!\n\n#스레드 #트렌드 #${trend.title.replace(/\s+/g, '')} #실시간이슈`;
   }
 
   /**

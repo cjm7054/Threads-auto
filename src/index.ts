@@ -76,24 +76,34 @@ async function main() {
     console.log("📝 [1단계] 생성된 스레드 본문 (고도달 포스트):\n" + generatedText);
     console.log("------------------------------------------");
 
-    // 3안 전략: 뉴스 기사 대표 사진 우선 사용 -> 없을 경우 Gemini AI 맞춤 이미지 생성
-    let postImageUrl = selectedTrend.pictureUrl;
-    if (postImageUrl) {
-      console.log(`🖼️ [뉴스 사진 발견] 기사 대표 썸네일을 첨부합니다: ${postImageUrl}`);
-    } else {
-      console.log(`🎨 [뉴스 사진 없음] Gemini AI 기반 맞춤 시각화 이미지 생성 중...`);
+    // 3단계 미디어 파이프라인: 안정적인 이미지 URL 준비 (스레드 API는 확장자가 명확한 공개 CDN 이미지만 허용)
+    const wpClient = (wpUsername && wpAppPassword) ? new WordPressClient(wpUrl, wpUsername, wpAppPassword) : null;
+    let postImageUrl: string | undefined = undefined;
+
+    // 1) 뉴스 기사 사진이 있을 경우: 워드프레스 미디어 라이브러리에 올려서 insightlab365.com 정식 이미지 URL로 변환
+    if (selectedTrend.pictureUrl && wpClient) {
+      console.log(`🖼️ [뉴스 사진 발견] 워드프레스 미디어에 안전하게 등록 중: ${selectedTrend.pictureUrl.slice(0, 50)}...`);
+      const cdnUrl = await wpClient.uploadMedia(selectedTrend.pictureUrl, "news.jpg");
+      if (cdnUrl) {
+        postImageUrl = cdnUrl;
+      }
+    }
+
+    // 2) 위 과정 실패 또는 뉴스 사진이 없을 경우: Gemini AI 프롬프트 기반 고화질 이미지 URL 생성
+    if (!postImageUrl) {
+      console.log(`🎨 [맞춤 이미지] Gemini AI 기반 이슈 시각화 이미지 생성 중...`);
       postImageUrl = await aiWriter.generateImageUrl(selectedTrend);
       console.log(`🖼️ [AI 이미지 준비 완료] ${postImageUrl}`);
     }
 
-    // 1단계: 본문 + 이미지 포스팅 (이미지 URL이 Meta 서버에서 거부될 경우 즉시 텍스트 단독으로 자동 재시도)
+    // 1단계: 본문 + 고화질 이미지 포스팅 (이미지 실패 시 텍스트 단독 자동 폴백)
     let result = await client.post({
       text: generatedText,
       imageUrl: postImageUrl,
     });
 
     if (!result.success && postImageUrl) {
-      console.warn(`⚠️ [이미지 컨테이너 실패] 외부 이미지 URL 접근 문제로 텍스트 단독 포스팅으로 자동 전환합니다... (${result.error})`);
+      console.warn(`⚠️ [이미지 컨테이너 실패] 텍스트 단독 포스팅으로 자동 전환합니다... (${result.error})`);
       result = await client.post({
         text: generatedText,
       });

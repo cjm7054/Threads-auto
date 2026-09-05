@@ -66,10 +66,9 @@ export class AiWriter {
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           let postContent = data.candidates[0].content.parts[0].text.trim();
 
-          // AI가 뱉은 메타 태그 / 영문 주석 완벽 박멸 필터
-          postContent = postContent.replace(/\(?\[?(CTA|Checklist|Hook|Body|Thought|Thinking|Fixed Text Required)[\s\S]*?\)?\*?\*?:?\s*/gi, "").trim();
-          postContent = postContent.replace(/^\*\s*\*Text:\*\s*/i, "").trim();
-          postContent = postContent.replace(/\*?\*?Character Count[\s\S]*?\n*/gi, "").trim();
+          // 생각 과정 태그나 불필요한 메타 라벨만 깔끔하게 제거 (본문 내용은 1글자도 건드리지 않음)
+          postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
+          postContent = postContent.replace(/^(Hook|Body|Thought|Thinking|CTA):?\s*/gmi, "").trim();
 
           return postContent;
         }

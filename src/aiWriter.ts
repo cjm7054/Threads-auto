@@ -41,40 +41,47 @@ export class AiWriter {
    - 오직 실제 스레드에 그대로 올라갈 '최종 완성 본문 텍스트' 단 하나만 출력하세요.
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    // 트래픽 폭주 시 자동 대체 모델 목록 (가장 안정적인 모델 순서)
+    const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.6-flash"];
+    let lastError = "";
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
+    for (const currentModel of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 800,
-        },
-      }),
-    });
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 800,
+            },
+          }),
+        });
 
-    const data = await response.json() as any;
+        const data = await response.json() as any;
 
-    if (!response.ok || !data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      const errorMsg = data.error?.message || response.statusText;
-      throw new Error(`Gemini AI 글 생성 실패: ${errorMsg}`);
+        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          let postContent = data.candidates[0].content.parts[0].text.trim();
+
+          // 혹시라도 남아있을 수 있는 AI 생각 메모 / 체크리스트 패턴 코드 레벨에서 강제 제거
+          postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
+          postContent = postContent.replace(/^[\s\S]*?(?=[\uAC00-\uD7A3]|🔥|🚀|📢|💡|⚠️|📌)/i, "").trim();
+
+          return postContent;
+        }
+
+        lastError = data.error?.message || response.statusText;
+        console.warn(`⚠️ [${currentModel}] 일시적 지연/오류로 대체 모델 전환 시도: ${lastError}`);
+      } catch (e: any) {
+        lastError = e.message || String(e);
+      }
     }
 
-    let postContent = data.candidates[0].content.parts[0].text.trim();
-
-    // 혹시라도 남아있을 수 있는 AI 생각 메모 / 체크리스트 패턴 코드 레벨에서 강제 제거
-    postContent = postContent.replace(/\[?Checklist[\s\S]*?\n\n/gi, "").trim();
-    postContent = postContent.replace(/^[\s\S]*?(?=[\uAC00-\uD7A3]|🔥|🚀|📢|💡|⚠️|📌)/i, "").trim();
-
-    return postContent;
+    throw new Error(`모든 Gemini 모델 호출 실패: ${lastError}`);
   }
 
   /**

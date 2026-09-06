@@ -163,29 +163,39 @@ Do not include quotation marks, style jargon, or explanations. Output ONLY the p
 5. <html>, <body>, <h1> 태그나 코드블럭 따옴표(\`\`\`html)는 일절 쓰지 말고, 오직 바로 워드프레스 본문에 들어갈 본문 HTML만 출력해.
 첫 번째 줄에는 반드시 "TITLE: [제목 내용]" 형식으로 제목을 명시하고, 한 줄 띄운 뒤 본문 HTML을 출력할 것.`;
 
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 2500, temperature: 0.7 },
-        }),
-      });
+    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
 
-      if (response.ok) {
+    for (const currentModel of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { maxOutputTokens: 2500, temperature: 0.7 },
+          }),
+        });
+
         const data = await response.json() as any;
-        const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
-        const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/m);
-        const articleTitle = titleMatch ? titleMatch[1].trim() : `[이슈 분석] ${trend.title} - 핵심 내용과 주요 쟁점 정리`;
-        const htmlContent = rawOutput.replace(/^TITLE:\s*.+\n*/m, "").replace(/```html|```/g, "").trim();
+        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          const rawOutput = data.candidates[0].content.parts[0].text.trim();
 
-        return { title: articleTitle, html: htmlContent };
+          const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/m);
+          const articleTitle = titleMatch ? titleMatch[1].trim() : `[이슈 분석] ${trend.title} - 핵심 내용과 주요 쟁점 정리`;
+          const htmlContent = rawOutput.replace(/^TITLE:\s*.+\n*/m, "").replace(/```html|```/g, "").trim();
+
+          if (htmlContent.length >= 300) {
+            console.log(`✅ [${currentModel}] 1,500자 상세 워드프레스 기사 생성 완료! (${htmlContent.length}자)`);
+            return { title: articleTitle, html: htmlContent };
+          }
+        } else {
+          console.warn(`⚠️ [${currentModel}] 워드프레스 본문 생성 실패:`, data.error?.message || response.statusText);
+        }
+      } catch (e: any) {
+        console.warn(`⚠️ [${currentModel}] 워드프레스 글 생성 오류:`, e.message || String(e));
       }
-    } catch (e) {
-      console.warn("⚠️ Gemini 블로그 글 생성 실패, 기본 템플릿 대체:", e);
     }
 
     const fallbackTitle = `[실시간 트렌드] ${trend.title} 관련 주요 소식 및 전체 분석`;

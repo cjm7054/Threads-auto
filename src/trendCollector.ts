@@ -12,25 +12,50 @@ export interface TrendItem {
 }
 
 export class TrendCollector {
-  private rssUrl = "https://trends.google.com/trending/rss?geo=KR";
+  private rssUrls = [
+    "https://trends.google.com/trending/rss?geo=KR",
+    "https://trends.google.co.kr/trending/rss?geo=KR",
+    "https://trends.google.com/trends/trendingsearches/daily/rss?geo=KR"
+  ];
 
   /**
    * 구글 트렌드 RSS 피드를 파싱하여 최신 트렌드 리스트를 가져옵니다.
+   * 구글 서버의 500/503 일시적 오류 시 최대 3회 재시도합니다.
    */
   async fetchTrends(): Promise<TrendItem[]> {
-    const response = await fetch(this.rssUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      },
-    });
+    let lastError = "";
 
-    if (!response.ok) {
-      throw new Error(`구글 트렌드 RSS 수집 실패: ${response.statusText} (${response.status})`);
+    for (const url of this.rssUrls) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const response = await fetch(url, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+              "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+            },
+          });
+
+          if (response.ok) {
+            const xml = await response.text();
+            const items = this.parseRss(xml);
+            if (items.length > 0) {
+              return items;
+            }
+          }
+          lastError = `${response.statusText} (${response.status})`;
+        } catch (e: any) {
+          lastError = e.message || String(e);
+        }
+
+        if (attempt < 3) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      }
     }
 
-    const xml = await response.text();
-    return this.parseRss(xml);
+    throw new Error(`구글 트렌드 RSS 수집 실패: ${lastError}`);
   }
 
   private parseRss(xml: string): TrendItem[] {

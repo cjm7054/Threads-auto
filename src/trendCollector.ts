@@ -58,22 +58,35 @@ export class TrendCollector {
     throw new Error(`구글 트렌드 RSS 수집 실패: ${lastError}`);
   }
 
+  private cleanText(str?: string): string | undefined {
+    if (!str) return undefined;
+    return str
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+  }
+
   private parseRss(xml: string): TrendItem[] {
     const items: TrendItem[] = [];
     const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
     for (const rawItem of itemMatches) {
       const titleMatch = rawItem.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || rawItem.match(/<title>(.*?)<\/title>/);
-      const title = titleMatch ? titleMatch[1].trim() : "";
+      const title = this.cleanText(titleMatch ? titleMatch[1] : "") || "";
 
       if (!title) continue;
 
       const trafficMatch = rawItem.match(/<ht:approx_traffic>(.*?)<\/ht:approx_traffic>/);
-      const approxTraffic = trafficMatch ? trafficMatch[1].trim() : undefined;
+      const approxTraffic = this.cleanText(trafficMatch ? trafficMatch[1] : undefined);
 
       const newsTitleMatch = rawItem.match(/<ht:news_item_title><!\[CDATA\[(.*?)\]\]><\/ht:news_item_title>/) ||
                              rawItem.match(/<ht:news_item_title>(.*?)<\/ht:news_item_title>/);
-      const newsTitle = newsTitleMatch ? newsTitleMatch[1].trim() : undefined;
+      const newsTitle = this.cleanText(newsTitleMatch ? newsTitleMatch[1] : undefined);
 
       const newsUrlMatch = rawItem.match(/<ht:news_item_url><!\[CDATA\[(.*?)\]\]><\/ht:news_item_url>/) ||
                            rawItem.match(/<ht:news_item_url>(.*?)<\/ht:news_item_url>/);
@@ -81,7 +94,7 @@ export class TrendCollector {
 
       const snippetMatch = rawItem.match(/<ht:news_item_snippet><!\[CDATA\[(.*?)\]\]><\/ht:news_item_snippet>/) ||
                            rawItem.match(/<ht:news_item_snippet>(.*?)<\/ht:news_item_snippet>/);
-      const snippet = snippetMatch ? snippetMatch[1].trim() : undefined;
+      const snippet = this.cleanText(snippetMatch ? snippetMatch[1] : undefined);
 
       const pictureMatch = rawItem.match(/<ht:picture><!\[CDATA\[(.*?)\]\]><\/ht:picture>/) ||
                            rawItem.match(/<ht:picture>(.*?)<\/ht:picture>/) ||

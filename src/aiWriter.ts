@@ -107,10 +107,16 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
    */
   async generateImageUrl(trend: TrendItem): Promise<string> {
     try {
-      const promptQuery = `Topic: "${trend.title}". Context: "${trend.newsTitle || ''}".
-You are an expert visual art director. Write a vivid, cinematic, high-impact English prompt (under 25 words) to generate a stunning 4K photo or modern 3D render representing this topic.
-Focus on: vibrant lighting, clean composition, hyper-realistic details, modern aesthetics.
-Do NOT include any text, letters, watermarks, or screenshots in the scene. Output ONLY the English prompt.`;
+      const promptQuery = `주제: "${trend.title}", 관련 기사 내용: "${trend.newsTitle || ''}"
+너는 글로벌 매거진 수석 비주얼 아트 디렉터야.
+위 기사 내용의 본질을 정확히 시각화하는 영문 이미지 생성 프롬프트(20단어 이내)를 작성해줘.
+
+[규칙]
+1. 주제가 IT/인공지능/기술(예: GPT, AI, 엔비디아)인 경우: 사람 얼굴 대신 첨단 AI 슈퍼컴퓨터 코어, 미래형 마이크로칩 회로, 빛나는 광섬유 데이터센터 등 사실적인 미래 테크 비주얼로 표현할 것. (절대 엉뚱한 여성/캐릭터 얼굴을 그리지 말 것)
+2. 주제가 스포츠인 경우: 해당 종목 경기장, 잔디 구장, 역동적인 공 등 현장감이 살아있는 실사 장면.
+3. 주제가 경제/사회인 경우: 현대적인 도시 마천루, 증권 거래소 차트 그래픽, 관련 상징물.
+4. 절대 텍스트, 알파벳, 로고, 글자가 들어가지 않게 할 것.
+오직 영문 프롬프트 문장만 단독으로 출력해.`;
 
       const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
       let visualPrompt = "";
@@ -123,7 +129,7 @@ Do NOT include any text, letters, watermarks, or screenshots in the scene. Outpu
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [{ parts: [{ text: promptQuery }] }],
-              generationConfig: { maxOutputTokens: 80, temperature: 0.6 },
+              generationConfig: { maxOutputTokens: 100, temperature: 0.4 },
             }),
           });
           if (res.ok) {
@@ -135,16 +141,17 @@ Do NOT include any text, letters, watermarks, or screenshots in the scene. Outpu
       }
 
       if (!visualPrompt) {
-        visualPrompt = `Cinematic photorealistic editorial visual of ${trend.title}, highly detailed, 4k, trending on artstation`;
+        visualPrompt = `Futuristic high-tech AI supercomputer core, glowing circuit boards, blue and gold cinematic lighting, 8k render`;
       }
 
+      console.log(`🎨 [AI 비주얼 프롬프트 확정] ${visualPrompt}`);
+
       // 글자/워터마크 없는 1080x1080 고화질 실사 렌더링
-      const cleanPrompt = encodeURIComponent(`${visualPrompt}, ultra hd, 8k, photorealistic, dramatic lighting, no text, no watermark`);
+      const cleanPrompt = encodeURIComponent(`${visualPrompt}, masterpiece, highly detailed, photorealistic, cinematic lighting, 8k resolution, no text, no watermark`);
       return `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&model=flux&nologo=true&enhance=true`;
     } catch (err) {
       console.warn("⚠️ AI 맞춤 비주얼 생성 중 오류, 기본 테마 비주얼 적용:", err);
-      const safeTitle = encodeURIComponent(trend.title);
-      return `https://image.pollinations.ai/prompt/stunning%20cinematic%20editorial%20visual%20of%20${safeTitle}%204k?width=1080&height=1080&model=flux&nologo=true`;
+      return `https://image.pollinations.ai/prompt/futuristic%20high%20technology%20concept%208k%20render%20cinematic?width=1080&height=1080&model=flux&nologo=true`;
     }
   }
 

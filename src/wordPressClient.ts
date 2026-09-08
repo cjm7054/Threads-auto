@@ -78,6 +78,24 @@ export class WordPressClient {
         throw new Error(`이미지 다운로드 실패: ${imgRes.statusText}`);
       }
 
+      const rawContentType = imgRes.headers.get("content-type") || "";
+      let contentType = "image/jpeg";
+      let ext = "jpg";
+
+      if (rawContentType.includes("png")) {
+        contentType = "image/png";
+        ext = "png";
+      } else if (rawContentType.includes("webp")) {
+        contentType = "image/webp";
+        ext = "webp";
+      } else if (rawContentType.includes("gif")) {
+        contentType = "image/gif";
+        ext = "gif";
+      }
+
+      const cleanBaseName = filename.replace(/\.[^/.]+$/, "");
+      const finalFileName = `${Date.now()}_${cleanBaseName}.${ext}`;
+
       const buffer = await imgRes.arrayBuffer();
       const uploadUrl = `${this.baseUrl}/wp-json/wp/v2/media`;
       const authHeader = "Basic " + Buffer.from(`${this.username}:${this.appPassword}`).toString("base64");
@@ -86,8 +104,8 @@ export class WordPressClient {
         method: "POST",
         headers: {
           Authorization: authHeader,
-          "Content-Disposition": `attachment; filename="${Date.now()}_${filename}"`,
-          "Content-Type": "image/jpeg",
+          "Content-Disposition": `attachment; filename="${finalFileName}"`,
+          "Content-Type": contentType,
         },
         body: buffer,
       });

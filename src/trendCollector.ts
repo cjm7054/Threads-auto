@@ -58,6 +58,55 @@ export class TrendCollector {
     throw new Error(`구글 트렌드 RSS 수집 실패: ${lastError}`);
   }
 
+  /**
+   * 뉴스 원문 URL(newsUrl)에 접속하여 언론사 공식 고화질 대표 이미지(og:image)를 추출합니다.
+   * 구글 트렌드 RSS 썸네일(150px) 대신 1200x630 이상의 선명한 실제 보도 사진 원본을 획득합니다.
+   */
+  async fetchArticleOgImage(newsUrl?: string): Promise<string | undefined> {
+    if (!newsUrl) return undefined;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃
+
+      const response = await fetch(newsUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+        },
+        redirect: "follow",
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) return undefined;
+
+      const html = await response.text();
+
+      // <meta property="og:image" content="..."> 또는 <meta content="..." property="og:image"> 정규식 매칭
+      const match =
+        html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+        html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+
+      if (match && match[1]) {
+        let imageUrl = match[1].trim();
+        // 상대 경로인 경우 절대 경로로 보정
+        if (imageUrl.startsWith("//")) {
+          imageUrl = "https:" + imageUrl;
+        } else if (imageUrl.startsWith("/")) {
+          const parsedUrl = new URL(newsUrl);
+          imageUrl = `${parsedUrl.origin}${imageUrl}`;
+        }
+        return imageUrl;
+      }
+    } catch (e: any) {
+      console.warn(`⚠️ 뉴스 원문 og:image 추출 중 건너뜀 (${newsUrl}):`, e.message || String(e));
+    }
+    return undefined;
+  }
+
   private cleanText(str?: string): string | undefined {
     if (!str) return undefined;
     return str

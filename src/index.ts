@@ -76,10 +76,30 @@ async function main() {
     console.log("📝 [1단계] 생성된 스레드 본문 (고도달 포스트):\n" + generatedText);
     console.log("------------------------------------------");
 
-    // 3단계 미디어 파이프라인: 흐릿한 트위터/기사 캡처 대신 1080x1080 초고화질 맞춤 비주얼(Flux 모델) 생성
-    console.log(`🎨 [비주얼 생성] 이슈 "${selectedTrend.title}" 주제에 최적화된 1080x1080 고화질 비주얼 제작 중...`);
-    let postImageUrl = await aiWriter.generateImageUrl(selectedTrend);
-    console.log(`🖼️ [고화질 비주얼 준비 완료] ${postImageUrl}`);
+    // 3단계 미디어 파이프라인:
+    // 1순위: 실제 언론사 뉴스 보도 사진이 있으면 워드프레스 CDN에 안전하게 업로드하여 실물 보도 사진 사용
+    // 2순위: 뉴스 사진이 없거나 실패할 경우, 다큐멘터리/실사 보도사진 스타일 AI 이미지 생성
+    let postImageUrl: string | undefined = undefined;
+
+    if (selectedTrend.pictureUrl && wpUsername && wpAppPassword) {
+      console.log(`📸 [실제 뉴스 사진 발견] 언론사 보도 사진을 워드프레스 미디어로 변환 중... (${selectedTrend.pictureUrl})`);
+      try {
+        const wpClient = new WordPressClient(wpUrl, wpUsername, wpAppPassword);
+        const uploadedUrl = await wpClient.uploadMedia(selectedTrend.pictureUrl, "news_photo.jpg");
+        if (uploadedUrl) {
+          postImageUrl = uploadedUrl;
+          console.log(`🌟 [실제 뉴스 보도 사진 확정] ${postImageUrl}`);
+        }
+      } catch (mediaErr) {
+        console.warn("⚠️ 실제 뉴스 사진 변환 실패, AI 보도사진으로 대체합니다:", mediaErr);
+      }
+    }
+
+    if (!postImageUrl) {
+      console.log(`🎨 [AI 보도사진 생성] "${selectedTrend.title}" 뉴스 맥락과 일치하는 사실적 다큐멘터리 사진 제작 중...`);
+      postImageUrl = await aiWriter.generateImageUrl(selectedTrend);
+      console.log(`🖼️ [다큐멘터리 보도사진 준비 완료] ${postImageUrl}`);
+    }
 
     // 1단계: 본문 + 고화질 이미지 포스팅 (이미지 실패 시 텍스트 단독 자동 폴백)
     let result = await client.post({

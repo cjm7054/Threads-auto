@@ -102,20 +102,28 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
   }
 
   /**
-   * 이슈 주제를 바탕으로 1080x1080 정방형 초고화질 맞춤 비주얼(실사/3D 그래픽)을 생성합니다.
-   * 흐릿한 기사 캡처를 완전히 대체하여 피드에서 즉각적인 주목을 이끌어냅니다.
+   * 이슈 주제를 바탕으로 사실적이고 생생한 보도 사진(다큐멘터리/실사 포토저널리즘 스타일) 비주얼을 생성합니다.
+   * SF/우주/판타지/만화/얼굴 캐릭터를 철저히 배제하고 뉴스 맥락과 100% 일치시킵니다.
    */
   async generateImageUrl(trend: TrendItem): Promise<string> {
     try {
-      const promptQuery = `주제: "${trend.title}", 관련 기사 내용: "${trend.newsTitle || ''}"
-너는 글로벌 매거진 수석 비주얼 아트 디렉터야.
-위 기사 내용의 본질을 정확히 시각화하는 영문 이미지 생성 프롬프트(20단어 이내)를 작성해줘.
+      const promptQuery = `주제: "${trend.title}", 관련 기사 내용: "${trend.newsTitle || ''}", 요약: "${trend.snippet || ''}"
+너는 퓰리처상 수상 경력의 글로벌 통신사(로이터, AP) 수석 사진 보도 디렉터야.
+위 뉴스 기사의 사건 현장과 맥락을 완벽히 대변하는 '사실적인 보도 사진(Photojournalism)' 영문 프롬프트(25단어 이내)를 작성해줘.
 
-[규칙]
-1. 주제가 IT/인공지능/기술(예: GPT, AI, 엔비디아)인 경우: 사람 얼굴 대신 첨단 AI 슈퍼컴퓨터 코어, 미래형 마이크로칩 회로, 빛나는 광섬유 데이터센터 등 사실적인 미래 테크 비주얼로 표현할 것. (절대 엉뚱한 여성/캐릭터 얼굴을 그리지 말 것)
-2. 주제가 스포츠인 경우: 해당 종목 경기장, 잔디 구장, 역동적인 공 등 현장감이 살아있는 실사 장면.
-3. 주제가 경제/사회인 경우: 현대적인 도시 마천루, 증권 거래소 차트 그래픽, 관련 상징물.
-4. 절대 텍스트, 알파벳, 로고, 글자가 들어가지 않게 할 것.
+[엄격한 생성 규칙]
+1. 날씨/자연재해/침수/폭우(예: 비, 태풍, 지하차도, 홍수):
+   - 실제 비가 쏟아지는 아스팔트 도로, 물에 잠긴 지하차도 또는 빗물 고인 도심 거리 등 사실적인 뉴스 보도 사진. (절대 우주, 판타지, 그래픽 아트를 그리지 말 것)
+   - 예시: "Documentary photo of heavy rain pouring on an urban flooded street underpass, realistic news photography, cloudy dark rainy sky"
+2. 경제/물가/부동산:
+   - 실제 도시 마천루 비즈니스 빌딩가, 실제 마켓/증권 거래소 풍경 등 차분한 실사 보도 사진.
+3. 사회/교통/사건사고:
+   - 관련 현장, 도로, 관공서, 실제 뉴스 배경에 맞는 현장 실사 사진.
+4. 스포츠:
+   - 해당 종목의 잔디 경기장, 야구장/축구장 필드 실사 보도 사진.
+5. IT/인공지능/테크:
+   - 실제 첨단 데이터센터 서버 랙 룸 또는 실물 마이크로칩 하드웨어 실사 사진.
+6. [절대 금지]: 판타지, SF, 외계 행성, 우주선, 애니메이션, 일러스트, 인물(여성/남성)의 정면 클로즈업 얼굴, 글자, 텍스트, 로고 금지.
 오직 영문 프롬프트 문장만 단독으로 출력해.`;
 
       const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
@@ -129,7 +137,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [{ parts: [{ text: promptQuery }] }],
-              generationConfig: { maxOutputTokens: 100, temperature: 0.4 },
+              generationConfig: { maxOutputTokens: 100, temperature: 0.3 },
             }),
           });
           if (res.ok) {
@@ -141,17 +149,17 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
       }
 
       if (!visualPrompt) {
-        visualPrompt = `Futuristic high-tech AI supercomputer core, glowing circuit boards, blue and gold cinematic lighting, 8k render`;
+        visualPrompt = `Realistic documentary news photo of ${trend.title}, authentic photojournalism, realistic natural lighting`;
       }
 
-      console.log(`🎨 [AI 비주얼 프롬프트 확정] ${visualPrompt}`);
+      console.log(`🎨 [보도사진 AI 비주얼 프롬프트 확정] ${visualPrompt}`);
 
-      // 글자/워터마크 없는 1080x1080 고화질 실사 렌더링
-      const cleanPrompt = encodeURIComponent(`${visualPrompt}, masterpiece, highly detailed, photorealistic, cinematic lighting, 8k resolution, no text, no watermark`);
-      return `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&model=flux&nologo=true&enhance=true`;
+      // 사실적 다큐멘터리 보도 사진 스타일 주입, 판타지/글자 배제
+      const cleanPrompt = encodeURIComponent(`${visualPrompt}, realistic documentary photography, authentic photojournalism, natural lighting, high resolution, 35mm photograph, no text, no watermark, realistic`);
+      return `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&model=flux&nologo=true&enhance=false`;
     } catch (err) {
-      console.warn("⚠️ AI 맞춤 비주얼 생성 중 오류, 기본 테마 비주얼 적용:", err);
-      return `https://image.pollinations.ai/prompt/futuristic%20high%20technology%20concept%208k%20render%20cinematic?width=1080&height=1080&model=flux&nologo=true`;
+      console.warn("⚠️ AI 맞춤 비주얼 생성 중 오류, 기본 보도사진 테마 적용:", err);
+      return `https://image.pollinations.ai/prompt/realistic%20documentary%20news%20photo%20city%20street%20natural%20lighting?width=1080&height=1080&model=flux&nologo=true`;
     }
   }
 

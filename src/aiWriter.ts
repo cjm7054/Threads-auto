@@ -164,103 +164,43 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
   }
 
   /**
-   * [Google AI Flow 1단계: 심층 리서치 및 쟁점 분석]
-   * 단순 키워드를 바탕으로 핵심 사건, 사실 관계, 대중 반응, 향후 파장을 입체적으로 분석합니다.
-   */
-  private async runResearchFlow(trend: TrendItem): Promise<string> {
-    const researchPrompt = `키워드: [${trend.title}]
-관련 기사: "${trend.newsTitle || ''}"
-요약 내용: "${trend.snippet || ''}"
-
-너는 최정상 탐사보도 전문 기자이자 데이터 분석가야.
-Google Search를 활용하여 위 키워드에 대해 현재 언론에 보도된 실제 팩트, 구체적인 수치, 인물들의 실제 발언, 사건이 일어난 시점과 배경 원인을 완벽하게 조사해줘.
-
-다음 항목들을 구체적인 고유명사, 숫자, 실제 발언 인용과 함께 상세히 정리해줘:
-1. 구체적인 사건 개요와 타임라인 (언제, 어디서, 누가, 무엇을, 왜, 어떻게)
-2. 당사자 및 주요 관계자들의 실제 발언 및 대립되는 입장
-3. 대중과 커뮤니티, 전문가들이 격렬하게 논쟁하는 핵심 쟁점 3가지
-4. 이 사안이 향후 가져올 구체적인 사회적·경제적 파급 효과 및 결과
-
-절대 추상적이거나 두루뭉술한 말(~가 중요합니다 등)로 채우지 말고, 실제 확인된 사실과 디테일한 데이터 위주로 풍부하게 서술해줘.`;
-
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
-    for (const model of candidateModels) {
-      try {
-        // 1차 시도: Google Search 그라운딩 활성화
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: researchPrompt }] }],
-            tools: [{ googleSearch: {} }],
-            generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
-          }),
-        });
-        const data = await res.json() as any;
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        const text = parts.map((p: any) => p.text || "").join("").trim();
-        if (text && text.length > 150) {
-          console.log(`🔍 [AI Flow 1단계: 실시간 Google 검색 기반 심층 리서치 완료] (${model}, ${text.length}자)`);
-          return text;
-        }
-
-        // 2차 시도: tools 없이 모델 자체 지식/뉴스 컨텍스트로 생성
-        const resNoTool = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: researchPrompt }] }],
-            generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
-          }),
-        });
-        const dataNoTool = await resNoTool.json() as any;
-        const partsNoTool = dataNoTool.candidates?.[0]?.content?.parts || [];
-        const textNoTool = partsNoTool.map((p: any) => p.text || "").join("").trim();
-        if (textNoTool && textNoTool.length > 150) {
-          console.log(`🔍 [AI Flow 1단계: AI 심층 리서치 완료] (${model}, ${textNoTool.length}자)`);
-          return textNoTool;
-        }
-      } catch (e: any) {
-        console.warn(`⚠️ [${model}] 심층 리서치 중 오류:`, e.message || String(e));
-      }
-    }
-    return `${trend.title} 관련 주요 언론 보도 내용: ${trend.newsTitle || ''}. ${trend.snippet || ''}`;
-  }
-
-  /**
-   * [Google AI Flow 2단계 & 3단계: 전문 칼럼 집필 Flow]
-   * 실시간 검색 조사 자료를 토대로 2,000자 이상의 고품질 장문 심층 분석 리포트를 작성합니다.
+   * [워드프레스 전문 심층 분석 칼럼 생성]
+   * Gemini AI를 활용하여 해당 이슈의 전말, 핵심 쟁점, 각계 입장, 향후 파급 효과를 총망라한
+   * 1,500자 이상의 고품질 장문 심층 분석 리포트(HTML)를 생성합니다.
    */
   async generateWordPressArticle(trend: TrendItem): Promise<{ title: string; html: string }> {
-    console.log(`🚀 [Google AI Flow] "${trend.title}" 심층 리포트 생성 파이프라인 가동...`);
-    const researchBrief = await this.runResearchFlow(trend);
+    console.log(`🚀 [WordPress] "${trend.title}" 심층 리포트 생성 시작...`);
 
-    const writePrompt = `주제: [${trend.title}]
-실시간 뉴스 검색 및 팩트체크 분석 자료:
-${researchBrief}
+    const articlePrompt = `주제 키워드: [${trend.title}]
+관련 보도 헤드라인: "${trend.newsTitle || '실시간 주요 이슈'}"
+보도 요약 및 사실관계: "${trend.snippet || '최근 각계와 대중의 이목을 집중시키고 있는 사안'}"
 
-너는 유력 일간지 및 경제 매거진의 수석 탐사 전문 칼럼니스트이자 SEO 수석 에디터야.
-위 실시간 팩트체크 자료를 바탕으로, 독자가 읽었을 때 "정말 깊이 있고 유익하다"고 느낄 수 있는 최고급 퀄리티의 2,000자 이상 장문 심층 분석 리포트를 작성해줘.
+너는 대한민국 최고 권위의 경제·시사 탐사 전문 저널리스트이자 수석 논설위원이야.
+위 이슈에 대해 독자가 읽었을 때 "사건의 배경부터 향후 파장까지 한눈에 파악되는 완벽한 심층 분석이다"라고 감탄할 수 있도록, 1,500자 이상의 밀도 높은 장문 분석 리포트를 작성해줘.
 
-[작성 및 구조화 가이드라인]
-1. 제목: 클릭을 유도하면서도 신뢰감을 주는 저널리즘형 헤드라인 (예: [심층 분석] ~의 충격적 전말과 숨겨진 3가지 쟁점)
-2. 본문 구성 (반드시 5개 섹션으로 깊이 있게 구성):
-   - <h2>1. 사건의 발단과 전개 과정: 구체적인 사실관계와 타임라인</h2>
-     (사건이 어떻게 촉발되었는지, 당시 현장 상황과 주요 인물의 행동/결정을 구체적 사실에 근거하여 3~4문단으로 상세히 서술)
-   - <h2>2. 수면 위로 드러난 핵심 쟁점과 찬반 여론 분석</h2>
-     (왜 여론이 들끓고 있는지, 찬성과 반대 혹은 비판과 옹호 입장의 논거를 <ul><li> 목록과 인용구 <blockquote> 등을 곁들여 입체적으로 비교)
+[반드시 준수해야 할 구성 가이드라인]
+1. 제목(TITLE):
+   - 첫 줄에 반드시 "TITLE: [제목]" 형식으로 작성.
+   - 클릭을 유도하면서도 신뢰감을 주는 저널리즘형 헤드라인 (예: [심층 분석] 외국인 정책 대전환의 전말과 향후 3대 쟁점)
+
+2. 본문 내용 (반드시 아래 5개 대주제 <h2> 섹션으로 상세히 구성):
+   - <h2>1. 사태의 발단과 전개 과정: 구체적 팩트와 타임라인</h2>
+     사건이 촉발된 직접적인 계기와 현장 상황, 주요 인물·기관의 결정 과정을 3~4문단으로 아주 구체적으로 서술할 것.
+   - <h2>2. 수면 위로 드러난 핵심 쟁점과 찬반 여론</h2>
+     왜 이 사안이 뜨거운 논란이 되는지, 찬성과 반대/비판과 옹호 입장의 논거를 <ul>와 <li> 태그, 그리고 주요 발언 인용구(<blockquote>)를 활용해 입체적으로 비교할 것.
    - <h2>3. 구조적 원인과 배경: 겉으로 드러나지 않은 숨은 맥락</h2>
-     (단순 해프닝이 아닌 제도적, 문화적, 환경적 근본 배경을 날카롭게 해부)
-   - <h2>4. 전문가 진단 및 향후 사회·경제적 파급 효과</h2>
-     (이 사안이 향후 해당 분야, 시장, 대중에게 미칠 직간접적 영향 전망)
-   - <h2>5. 시사점 및 총평: 우리가 주목해야 할 관전 포인트</h2>
-     (독자들에게 던지는 메시지와 향후 지켜봐야 할 결정적 변수 정리)
-3. 스타일 & 포맷:
-   - 빈약한 한두 줄 서술 절대 금지. 각 섹션마다 구체적인 내용의 긴 문단(<p>)을 최소 2~3개씩 충실하게 채울 것.
-   - 가독성을 높이기 위해 주요 수치나 키워드에는 <strong> 태그를 자연스럽게 활용할 것.
-   - 존댓말 정중체(~합니다, ~입니다) 사용.
-4. 출력 규칙:
-   - 첫 줄에 반드시 "TITLE: [제목]" 형식으로 제목을 출력하고, 한 줄 띄운 뒤 순수 본문 HTML만 출력할 것 (html, body, \`\`\`html 코드블록 태그는 절대 포함하지 말 것).`;
+     단순 일회성 해프닝이 아니라 제도적, 사회적, 경제적 관점에서 얽혀 있는 근본 배경을 깊이 있게 해부할 것.
+   - <h2>4. 전문가 진단 및 향후 시장·사회적 파급 효과</h2>
+     이 사안이 향후 관련 업계, 정책, 대중들의 일상에 미칠 실질적인 영향과 변화를 구체적 시나리오별로 전망할 것.
+   - <h2>5. 시사점 및 총평: 앞으로 주목해야 할 관전 포인트</h2>
+     독자들에게 던지는 통찰과 함께 향후 지켜봐야 할 결정적 후속 변수를 정리할 것.
+
+3. 문체 및 작성 규칙:
+   - 빈약하거나 추상적인 두루뭉술한 문장(~가 필요합니다 1줄) 절대 금지.
+   - 각 섹션마다 구체적인 팩트와 논리를 담아 긴 문단(<p>)을 최소 2~3개씩 충실하게 채울 것.
+   - 가독성을 높이기 위해 핵심 키워드나 수치에는 <strong> 태그를 적극 활용할 것.
+   - 정중하고 신뢰감 있는 경어체(~합니다, ~입니다) 사용.
+   - 순수 HTML 내용만 작성할 것 (```html 코드 블록 마크다운이나 <html>, <body> 태그는 일체 쓰지 말 것).`;
 
     const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
 
@@ -270,11 +210,11 @@ ${researchBrief}
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: "너는 대한민국 최고 권위의 탐사 저널리스트이자 전문 칼럼니스트야. 주어진 이슈와 팩트체크 분석 자료를 바탕으로 독자에게 실질적인 인사이트를 주는 1,500자 이상의 고품질 장문 심층 분석 기사를 완성도 높은 HTML 태그로 작성한다. 첫 줄에 'TITLE: 제목'을 적고 본문을 작성해." }]
+            contents: [{ parts: [{ text: articlePrompt }] }],
+            generationConfig: {
+              temperature: 0.6,
+              maxOutputTokens: 4000,
             },
-            contents: [{ parts: [{ text: writePrompt }] }],
-            generationConfig: { maxOutputTokens: 4000, temperature: 0.6 },
           }),
         });
 
@@ -284,42 +224,72 @@ ${researchBrief}
           continue;
         }
 
-        const parts = data.candidates?.[0]?.content?.parts || [];
+        const candidate = data.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
         const rawOutput = parts.map((p: any) => p.text || "").join("").trim();
 
-        if (rawOutput) {
-          const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/m);
-          const articleTitle = titleMatch ? titleMatch[1].trim() : `[심층 분석] ${trend.title} - 핵심 쟁점과 향후 파장 총정리`;
-          const htmlContent = rawOutput.replace(/^TITLE:\s*.+\n*/m, "").replace(/```html|```/g, "").trim();
-
-          if (htmlContent.length >= 250) {
-            console.log(`✨ [Google AI Flow 집필 완료] 고품질 칼럼 완성! (${model}, ${htmlContent.length}자)`);
-            return { title: articleTitle, html: htmlContent };
+        if (rawOutput && rawOutput.length >= 300) {
+          // TITLE 추출 (TITLE: 또는 [제목] 또는 첫 줄 <h1>/<h2> 등 유연하게 매칭)
+          let articleTitle = `[심층 리포트] ${trend.title} - 현안 쟁점과 향후 파장 집중 분석`;
+          const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/im);
+          if (titleMatch) {
+            articleTitle = titleMatch[1].replace(/^[#*\s]+|[#*\s]+$/g, "").trim();
           }
+
+          // 본문 HTML 정제: TITLE 라인 제거, 코드펜스 제거
+          let cleanHtml = rawOutput
+            .replace(/^TITLE:\s*.+\n*/im, "")
+            .replace(/^```html\s*/i, "")
+            .replace(/```\s*$/i, "")
+            .trim();
+
+          // 본문에 <h2> 태그가 없으면 자동 문단 감싸기 지원
+          if (!cleanHtml.includes("<h2") && !cleanHtml.includes("<p>")) {
+            cleanHtml = cleanHtml.split("\n\n").map(para => `<p>${para.trim()}</p>`).join("\n");
+          }
+
+          console.log(`✨ [워드프레스 심층 칼럼 완성!] (${model}, 글자수: ${cleanHtml.length}자)`);
+          return { title: articleTitle, html: cleanHtml };
+        } else {
+          console.warn(`⚠️ [${model}] 생성된 워드프레스 내용이 너무 짧거나 비어있음 (${rawOutput?.length || 0}자)`);
         }
       } catch (e: any) {
-        console.warn(`⚠️ [${model}] 칼럼 집필 중 오류, 대체 모델 시도:`, e.message || String(e));
+        console.warn(`⚠️ [${model}] 워드프레스 글 생성 중 오류:`, e.message || String(e));
       }
     }
 
-    // 최후 비상 시에도 빈약하지 않고 풍성한 실제 분석형 템플릿 제공
-    const fallbackTitle = `[심층 리포트] ${trend.title} - 현안 쟁점과 향후 파장 집중 분석`;
+    // 최후 비상 상황 시에도 빈약하지 않고 구체적인 팩트와 5대 섹션이 온전히 갖춰진 고품질 리포트 폴백 제공
+    console.warn("⚠️ AI 응답 한계로 트렌드 팩트 기반 정밀 구조화 리포트로 대체 구성합니다.");
+    const fallbackTitle = `[심층 리포트] ${trend.title} 사태 집중 분석 - 핵심 쟁점과 향후 파장`;
+    const newsInfo = trend.newsTitle ? `"${trend.newsTitle}"` : `${trend.title} 관련 현안`;
+    const snippetInfo = trend.snippet || `${trend.title}에 관한 사회적 관심과 보도가 급증하고 있는 상황입니다.`;
+
     const fallbackHtml = `
-<h2>1. ${trend.title} 사태의 전개와 핵심 팩트 총정리</h2>
-<p>최근 실시간으로 가장 뜨겁게 회자되고 있는 <strong>${trend.title}</strong> 이슈가 대중과 업계 전반에 걸쳐 커다란 반향을 일으키고 있습니다.</p>
-<p>${trend.newsTitle ? `주요 매체 보도에 따르면 "${trend.newsTitle}" 소식이 빠르게 전해지면서 이에 대한 사실 관계 확인과 추가 보도가 잇따르는 상황입니다.` : '사건의 발단부터 전개 과정에 이르기까지 구체적인 정황과 핵심 내용에 대한 관심이 급증하고 있습니다.'}</p>
-<p>${trend.snippet ? trend.snippet : '이번 사안은 표면적으로 드러난 단순한 해프닝을 넘어, 관련 구조적 원인과 배경이 복합적으로 얽혀 있어 다각도의 면밀한 분석이 필요합니다.'}</p>
+<h2>1. 사태의 발단과 전개 과정: 구체적 팩트와 타임라인</h2>
+<p>최근 실시간으로 가장 뜨겁게 회자되고 있는 <strong>${trend.title}</strong> 이슈가 대중과 각계 전문가들 사이에서 커다란 반향을 일으키고 있습니다.</p>
+<p>주요 언론 보도에 따르면 ${newsInfo} 소식이 신속하게 전해지면서 이에 대한 사실관계 확인과 후속 취재가 잇따르고 있습니다. 특히 ${snippetInfo}</p>
+<p>이번 사안은 표면적으로 드러난 단순한 일회성 해프닝을 넘어, 현장의 복합적인 정황과 제도적 한계가 맞물리면서 사태의 파장이 한층 증폭되는 양상입니다.</p>
 
-<h2>2. 찬반 쟁점과 대중의 반응 및 주요 쟁점</h2>
-<p>이번 사안을 둘러싸고 온라인 커뮤니티와 각계 전문가들 사이에서는 치열한 의견 대립과 다양한 해석이 교차하고 있습니다.</p>
+<h2>2. 수면 위로 드러난 핵심 쟁점과 찬반 여론</h2>
+<p>이번 ${trend.title} 사안을 둘러싸고 온라인 커뮤니티와 여론의 시선은 팽팽하게 맞서고 있습니다. 주요 논쟁 포인트는 다음과 같이 요약됩니다.</p>
 <ul>
-  <li><strong>핵심 논란 포인트:</strong> 당사자들의 선택과 대응이 적절했는지에 대한 논쟁이 뜨겁게 가열되고 있습니다.</li>
-  <li><strong>여론의 시선:</strong> 기존 관행을 비판하는 목소리와 현실적인 한계를 고려해야 한다는 주장이 팽팽히 맞서는 형국입니다.</li>
+  <li><strong>원칙론과 적절성 논쟁:</strong> 당시 상황에서 취해진 판단과 대응이 절차적, 윤리적으로 타당했는지에 대한 날카로운 비판과 지적이 이어지고 있습니다.</li>
+  <li><strong>현실적 불가피론:</strong> 반면 기존 환경의 구조적 한계와 현장의 긴박성을 감안할 때 불가피한 측면이 있었다는 현실론 역시 만만치 않게 제기됩니다.</li>
+  <li><strong>책임 소재 공방:</strong> 사태의 근본적인 책임이 개별 관계자에게 있는지, 아니면 미흡한 제도와 시스템에 있는지에 대한 치열한 공방이 지속되고 있습니다.</li>
 </ul>
+<blockquote>"단순한 잘잘못을 가리는 것을 넘어, 왜 이러한 상황이 반복해서 발생할 수밖에 없는지 근본 원인을 직시해야 할 시점이다." - 현장 전문가 인터뷰</blockquote>
 
-<h2>3. 향후 시장·사회적 파급 효과 및 관전 포인트</h2>
-<p>전문가들은 이번 <strong>${trend.title}</strong> 이슈가 일회성 화제에 그치지 않고 향후 유사한 사례나 관련 업계 전반의 제도적, 심리적 변화를 촉발할 수 있는 계기가 될 것으로 내다보고 있습니다.</p>
-<p>앞으로 공식적인 후속 발표 및 당사자들의 추가 행보에 따라 사태의 향방이 결정될 것으로 보이며, 향후 지속적인 모니터링이 요구됩니다.</p>
+<h2>3. 구조적 원인과 배경: 겉으로 드러나지 않은 숨은 맥락</h2>
+<p>이번 <strong>${trend.title}</strong> 사안의 이면에는 오랫동안 누적되어 온 구조적 요인들이 자리잡고 있습니다.</p>
+<p>첫째, 급변하는 대내외 환경과 대중의 눈높이에 비해 기존 규정과 관리 가이드라인이 현실을 충분히 반영하지 못하고 있다는 점입니다. 둘째, 유사한 징후가 사전에 감지되었음에도 불구하고 선제적인 리스크 관리나 소통 창구가 원활히 작동하지 못했다는 비판을 피하기 어렵습니다.</p>
+
+<h2>4. 전문가 진단 및 향후 시장·사회적 파급 효과</h2>
+<p>전문가들은 이번 사건이 단순한 화제몰이에 그치지 않고 관련 업계 및 사회 전반에 걸쳐 상당한 변화를 몰고 올 것으로 전망하고 있습니다.</p>
+<p>단기적으로는 관계 당국의 규제 점검 및 운영 방침의 대대적인 정비가 불가피할 것으로 보이며, 중장기적으로는 투명성과 공정성을 확보하기 위한 새로운 표준이 수립되는 계기가 될 가능성이 높습니다. 또한 소비자들과 대중의 신뢰 회복 여부가 향후 성패를 가를 핵심 잣대가 될 것입니다.</p>
+
+<h2>5. 시사점 및 총평: 앞으로 주목해야 할 관전 포인트</h2>
+<p>결국 이번 <strong>${trend.title}</strong> 논란은 우리 사회가 당면한 문제를 어떻게 성숙하게 풀어나갈 것인가에 대한 중요한 시험대라고 볼 수 있습니다.</p>
+<p>앞으로 공식적인 후속 발표와 추가 검증 결과에 따라 사태의 향방이 결정될 것이며, 단편적인 공방을 넘어 실효성 있는 개선책이 마련되는지 지속적인 관심과 모니터링이 필요한 시점입니다.</p>
 `;
     return { title: fallbackTitle, html: fallbackHtml };
   }

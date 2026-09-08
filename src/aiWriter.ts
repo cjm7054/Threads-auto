@@ -33,7 +33,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 5. 절대로 영어 체크리스트, "Here is the text:", 프롬프트 설명 같은 잡담을 쓰지 말고 오직 한국어 게시글 본문만 출력하세요.`;
 
     // Google Gemini API 최신 정식 지원 모델 우선순위
-    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {
@@ -126,7 +126,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 6. [절대 금지]: 판타지, SF, 외계 행성, 우주선, 애니메이션, 일러스트, 인물(여성/남성)의 정면 클로즈업 얼굴, 글자, 텍스트, 로고 금지.
 오직 영문 프롬프트 문장만 단독으로 출력해.`;
 
-      const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
+      const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash"];
       let visualPrompt = "";
 
       for (const model of candidateModels) {
@@ -180,7 +180,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 4. 향후 이 사건이 사회·경제·문화적으로 미칠 중장기 파급 효과
 각 항목별로 구체적이고 깊이 있는 분석 내용을 bullet point로 작성해줘.`;
 
-    const candidateModels = ["gemini-1.5-pro", "gemini-3.6-flash", "gemini-2.5-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
     for (const model of candidateModels) {
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
@@ -230,7 +230,7 @@ ${researchBrief}
    - 존댓말 정중체(~합니다, ~입니다) 사용.
 4. 첫 줄에 반드시 "TITLE: [제목]" 형식으로 제목을 출력하고, 한 줄 띄운 뒤 순수 본문 HTML만 출력할 것 (html, body, codeblock 제외).`;
 
-    const candidateModels = ["gemini-1.5-pro", "gemini-3.6-flash", "gemini-2.5-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
 
     for (const model of candidateModels) {
       try {
@@ -244,6 +244,11 @@ ${researchBrief}
         });
 
         const data = await response.json() as any;
+        if (!response.ok) {
+          console.warn(`⚠️ [${model}] 워드프레스 글 생성 API 응답 실패:`, data.error?.message || response.statusText);
+          continue;
+        }
+
         const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
         if (rawOutput) {
@@ -251,7 +256,7 @@ ${researchBrief}
           const articleTitle = titleMatch ? titleMatch[1].trim() : `[심층 분석] ${trend.title} - 핵심 쟁점과 향후 파장 총정리`;
           const htmlContent = rawOutput.replace(/^TITLE:\s*.+\n*/m, "").replace(/```html|```/g, "").trim();
 
-          if (htmlContent.length >= 500) {
+          if (htmlContent.length >= 250) {
             console.log(`✨ [Google AI Flow 집필 완료] 고품질 칼럼 완성! (${model}, ${htmlContent.length}자)`);
             return { title: articleTitle, html: htmlContent };
           }
@@ -261,16 +266,24 @@ ${researchBrief}
       }
     }
 
-    // 최후 비상 템플릿도 풍부하게 보강
-    const fallbackTitle = `[이슈 리포트] ${trend.title} - 주요 팩트 체크와 쟁점 분석`;
+    // 최후 비상 시에도 빈약하지 않고 풍성한 실제 분석형 템플릿 제공
+    const fallbackTitle = `[심층 리포트] ${trend.title} - 현안 쟁점과 향후 파장 집중 분석`;
     const fallbackHtml = `
-<h2>1. ${trend.title} 사태의 배경과 핵심 팩트</h2>
-<p>최근 온·오프라인을 뜨겁게 달구고 있는 <strong>${trend.title}</strong> 이슈는 단순한 일회성 사건을 넘어 사회적 관심사로 급부상하고 있습니다.</p>
-<p>${trend.newsTitle ? `주요 언론 보도에 따르면 "${trend.newsTitle}" 소식이 전해지며 다양한 해석과 반응이 엇갈리고 있습니다.` : ''}</p>
-<h2>2. 핵심 쟁점과 대중의 반응</h2>
-<p>${trend.snippet || '전문가들은 이번 사안이 지닌 구조적인 문제점과 향후 파급력에 주목하고 있으며, 온라인 커뮤니티에서도 찬반 논쟁이 치열하게 전개되고 있습니다.'}</p>
-<h2>3. 향후 전망 및 관전 포인트</h2>
-<p>이번 사안의 전개 방향에 따라 관련 업계와 시장에 적지 않은 변화가 예상되며, 공식적인 후속 발표를 주의 깊게 지켜볼 필요가 있습니다.</p>
+<h2>1. ${trend.title} 사태의 전개와 핵심 팩트 총정리</h2>
+<p>최근 실시간으로 가장 뜨겁게 회자되고 있는 <strong>${trend.title}</strong> 이슈가 대중과 업계 전반에 걸쳐 커다란 반향을 일으키고 있습니다.</p>
+<p>${trend.newsTitle ? `주요 매체 보도에 따르면 "${trend.newsTitle}" 소식이 빠르게 전해지면서 이에 대한 사실 관계 확인과 추가 보도가 잇따르는 상황입니다.` : '사건의 발단부터 전개 과정에 이르기까지 구체적인 정황과 핵심 내용에 대한 관심이 급증하고 있습니다.'}</p>
+<p>${trend.snippet ? trend.snippet : '이번 사안은 표면적으로 드러난 단순한 해프닝을 넘어, 관련 구조적 원인과 배경이 복합적으로 얽혀 있어 다각도의 면밀한 분석이 필요합니다.'}</p>
+
+<h2>2. 찬반 쟁점과 대중의 반응 및 주요 쟁점</h2>
+<p>이번 사안을 둘러싸고 온라인 커뮤니티와 각계 전문가들 사이에서는 치열한 의견 대립과 다양한 해석이 교차하고 있습니다.</p>
+<ul>
+  <li><strong>핵심 논란 포인트:</strong> 당사자들의 선택과 대응이 적절했는지에 대한 논쟁이 뜨겁게 가열되고 있습니다.</li>
+  <li><strong>여론의 시선:</strong> 기존 관행을 비판하는 목소리와 현실적인 한계를 고려해야 한다는 주장이 팽팽히 맞서는 형국입니다.</li>
+</ul>
+
+<h2>3. 향후 시장·사회적 파급 효과 및 관전 포인트</h2>
+<p>전문가들은 이번 <strong>${trend.title}</strong> 이슈가 일회성 화제에 그치지 않고 향후 유사한 사례나 관련 업계 전반의 제도적, 심리적 변화를 촉발할 수 있는 계기가 될 것으로 내다보고 있습니다.</p>
+<p>앞으로 공식적인 후속 발표 및 당사자들의 추가 행보에 따라 사태의 향방이 결정될 것으로 보이며, 향후 지속적인 모니터링이 요구됩니다.</p>
 `;
     return { title: fallbackTitle, html: fallbackHtml };
   }

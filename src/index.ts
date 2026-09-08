@@ -181,52 +181,7 @@ async function main() {
     if (result.success && result.threadId) {
       historyManager.addRecord(selectedTrend.title, result.threadId);
       console.log(`🎉 [스레드 본문 발행 완료] (ID: ${result.threadId})`);
-
-      // [4단계] 첫 대댓글(Reply) 발행: 쿠팡 파트너스 + 추가 안내
-      try {
-        const monetizationConfigPath = resolve(process.cwd(), "config", "monetization.json");
-        let mConfig: any = {};
-
-        if (existsSync(monetizationConfigPath)) {
-          mConfig = JSON.parse(readFileSync(monetizationConfigPath, "utf-8"));
-        }
-
-        const replyText = await aiWriter.generateReplyComment(selectedTrend, mConfig, actualWpUrl);
-        console.log(`💬 [수익 대댓글 자동 작성 중] (Reply to: ${result.threadId})`);
-        console.log("------------------------------------------");
-        console.log("📝 대댓글 본문:\n" + replyText);
-        console.log("------------------------------------------");
-
-        // Threads API 딜레이 및 재시도
-        let replySuccess = false;
-        if (!isDryRun) {
-          console.log("⏳ 본문 인덱싱 대기 중 (12초)...");
-          await new Promise((r) => setTimeout(r, 12000));
-
-          // 최대 3회 재시도 루프
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            console.log(`[Threads] 대댓글 발행 시도 (${attempt}/3)...`);
-            const replyResult = await client.post({
-              text: replyText,
-              replyToId: result.threadId,
-            });
-
-            if (replyResult.success) {
-              console.log(`🚀 [수익 대댓글 발행 성공!] (Reply ID: ${replyResult.threadId})`);
-              replySuccess = true;
-              break;
-            } else {
-              console.warn(`⚠️ 대댓글 시도 ${attempt} 실패: ${replyResult.error}`);
-              if (attempt < 3) {
-                console.log("⏳ 8초 후 재시도합니다...");
-                await new Promise((r) => setTimeout(r, 8000));
-              }
-            }
-          }
-        }
-      } catch (replyErr: any) {
-        console.warn(`⚠️ 대댓글 생성 중 예외 발생 (본문은 정상 게시됨):`, replyErr.message || replyErr);
-      }
+      console.log("ℹ️ 스레드 정책 준수: 자동 상업성 대댓글 발행을 생략하고 본문 링크 카드로 안전하게 연결합니다.");
 
       console.log(`✨ [키워드: ${selectedTrend.title}] 하이브리드 자동 포스팅 파이프라인 완료!`);
     } else {

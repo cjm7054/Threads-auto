@@ -102,43 +102,49 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
   }
 
   /**
-   * 이슈 주제를 바탕으로 고화질 AI 일러스트/실사 이미지 URL을 생성합니다.
-   * (기사 실제 사진이 없을 경우 대체용)
+   * 이슈 주제를 바탕으로 1080x1080 정방형 초고화질 맞춤 비주얼(실사/3D 그래픽)을 생성합니다.
+   * 흐릿한 기사 캡처를 완전히 대체하여 피드에서 즉각적인 주목을 이끌어냅니다.
    */
   async generateImageUrl(trend: TrendItem): Promise<string> {
     try {
-      // Gemini를 활용하여 해당 이슈에 어울리는 영문 시각화 프롬프트 1문장 생성
-      const promptQuery = `Topic: "${trend.title}". Related: "${trend.newsTitle || ''}".
-Generate a single short English prompt (under 15 words) for an image generator (like Midjourney or DALL-E) to create an editorial photo or high-quality illustration representing this news topic. 
-Do not include quotation marks, style jargon, or explanations. Output ONLY the prompt text in English.`;
+      const promptQuery = `Topic: "${trend.title}". Context: "${trend.newsTitle || ''}".
+You are an expert visual art director. Write a vivid, cinematic, high-impact English prompt (under 25 words) to generate a stunning 4K photo or modern 3D render representing this topic.
+Focus on: vibrant lighting, clean composition, hyper-realistic details, modern aesthetics.
+Do NOT include any text, letters, watermarks, or screenshots in the scene. Output ONLY the English prompt.`;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: promptQuery }] }],
-          generationConfig: { maxOutputTokens: 60, temperature: 0.5 },
-        }),
-      });
+      const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash"];
+      let visualPrompt = "";
 
-      let imagePrompt = "";
-      if (response.ok) {
-        const data = await response.json() as any;
-        imagePrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      for (const model of candidateModels) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: promptQuery }] }],
+              generationConfig: { maxOutputTokens: 80, temperature: 0.6 },
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json() as any;
+            visualPrompt = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+            if (visualPrompt) break;
+          }
+        } catch {}
       }
 
-      if (!imagePrompt) {
-        imagePrompt = `news editorial concept for ${trend.title}`;
+      if (!visualPrompt) {
+        visualPrompt = `Cinematic photorealistic editorial visual of ${trend.title}, highly detailed, 4k, trending on artstation`;
       }
 
-      // 안전한 URL 인코딩 적용 (Pollinations 고화질 이미지 생성 서비스)
-      const encodedPrompt = encodeURIComponent(imagePrompt.replace(/[\n\r]/g, " ").slice(0, 120));
-      return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1080&height=1080&nologo=true`;
+      // 글자/워터마크 없는 1080x1080 고화질 실사 렌더링
+      const cleanPrompt = encodeURIComponent(`${visualPrompt}, ultra hd, 8k, photorealistic, dramatic lighting, no text, no watermark`);
+      return `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&model=flux&nologo=true&enhance=true`;
     } catch (err) {
-      console.warn("⚠️ AI 이미지 생성 URL 구성 중 오류, 기본 트렌드 이미지 대체:", err);
+      console.warn("⚠️ AI 맞춤 비주얼 생성 중 오류, 기본 테마 비주얼 적용:", err);
       const safeTitle = encodeURIComponent(trend.title);
-      return `https://image.pollinations.ai/prompt/breaking%20news%20concept%20${safeTitle}?width=1080&height=1080&nologo=true`;
+      return `https://image.pollinations.ai/prompt/stunning%20cinematic%20editorial%20visual%20of%20${safeTitle}%204k?width=1080&height=1080&model=flux&nologo=true`;
     }
   }
 

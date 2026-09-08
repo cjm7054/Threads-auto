@@ -76,25 +76,10 @@ async function main() {
     console.log("📝 [1단계] 생성된 스레드 본문 (고도달 포스트):\n" + generatedText);
     console.log("------------------------------------------");
 
-    // 3단계 미디어 파이프라인: 안정적인 이미지 URL 준비 (스레드 API는 확장자가 명확한 공개 CDN 이미지만 허용)
-    const wpClient = (wpUsername && wpAppPassword) ? new WordPressClient(wpUrl, wpUsername, wpAppPassword) : null;
-    let postImageUrl: string | undefined = undefined;
-
-    // 1) 뉴스 기사 사진이 있을 경우: 워드프레스 미디어 라이브러리에 올려서 insightlab365.com 정식 이미지 URL로 변환
-    if (selectedTrend.pictureUrl && wpClient) {
-      console.log(`🖼️ [뉴스 사진 발견] 워드프레스 미디어에 안전하게 등록 중: ${selectedTrend.pictureUrl.slice(0, 50)}...`);
-      const cdnUrl = await wpClient.uploadMedia(selectedTrend.pictureUrl, "news.jpg");
-      if (cdnUrl) {
-        postImageUrl = cdnUrl;
-      }
-    }
-
-    // 2) 위 과정 실패 또는 뉴스 사진이 없을 경우: Gemini AI 프롬프트 기반 고화질 이미지 URL 생성
-    if (!postImageUrl) {
-      console.log(`🎨 [맞춤 이미지] Gemini AI 기반 이슈 시각화 이미지 생성 중...`);
-      postImageUrl = await aiWriter.generateImageUrl(selectedTrend);
-      console.log(`🖼️ [AI 이미지 준비 완료] ${postImageUrl}`);
-    }
+    // 3단계 미디어 파이프라인: 흐릿한 트위터/기사 캡처 대신 1080x1080 초고화질 맞춤 비주얼(Flux 모델) 생성
+    console.log(`🎨 [비주얼 생성] 이슈 "${selectedTrend.title}" 주제에 최적화된 1080x1080 고화질 비주얼 제작 중...`);
+    let postImageUrl = await aiWriter.generateImageUrl(selectedTrend);
+    console.log(`🖼️ [고화질 비주얼 준비 완료] ${postImageUrl}`);
 
     // 1단계: 본문 + 고화질 이미지 포스팅 (이미지 실패 시 텍스트 단독 자동 폴백)
     let result = await client.post({

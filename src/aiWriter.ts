@@ -186,6 +186,7 @@ Google Search를 활용하여 위 키워드에 대해 현재 언론에 보도된
     const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
     for (const model of candidateModels) {
       try {
+        // 1차 시도: Google Search 그라운딩 활성화
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -202,8 +203,25 @@ Google Search를 활용하여 위 키워드에 대해 현재 언론에 보도된
           console.log(`🔍 [AI Flow 1단계: 실시간 Google 검색 기반 심층 리서치 완료] (${model}, ${text.length}자)`);
           return text;
         }
+
+        // 2차 시도: tools 없이 모델 자체 지식/뉴스 컨텍스트로 생성
+        const resNoTool = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: researchPrompt }] }],
+            generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
+          }),
+        });
+        const dataNoTool = await resNoTool.json() as any;
+        const partsNoTool = dataNoTool.candidates?.[0]?.content?.parts || [];
+        const textNoTool = partsNoTool.map((p: any) => p.text || "").join("").trim();
+        if (textNoTool && textNoTool.length > 150) {
+          console.log(`🔍 [AI Flow 1단계: AI 심층 리서치 완료] (${model}, ${textNoTool.length}자)`);
+          return textNoTool;
+        }
       } catch (e: any) {
-        console.warn(`⚠️ [${model}] 실시간 검색 리서치 중 오류:`, e.message || String(e));
+        console.warn(`⚠️ [${model}] 심층 리서치 중 오류:`, e.message || String(e));
       }
     }
     return `${trend.title} 관련 주요 언론 보도 내용: ${trend.newsTitle || ''}. ${trend.snippet || ''}`;
@@ -252,8 +270,10 @@ ${researchBrief}
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: "너는 대한민국 최고 권위의 탐사 저널리스트이자 전문 칼럼니스트야. 주어진 이슈와 팩트체크 분석 자료를 바탕으로 독자에게 실질적인 인사이트를 주는 1,500자 이상의 고품질 장문 심층 분석 기사를 완성도 높은 HTML 태그로 작성한다. 첫 줄에 'TITLE: 제목'을 적고 본문을 작성해." }]
+            },
             contents: [{ parts: [{ text: writePrompt }] }],
-            tools: [{ googleSearch: {} }],
             generationConfig: { maxOutputTokens: 4000, temperature: 0.6 },
           }),
         });

@@ -172,13 +172,16 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 관련 기사: "${trend.newsTitle || ''}"
 요약 내용: "${trend.snippet || ''}"
 
-너는 전문 시사·트렌드 탐사 저널리스트이자 데이터 분석가야.
-위 이슈에 대해 다음 4가지 관점에서 깊이 있는 리서치 브리핑을 작성해줘:
-1. 핵심 팩트 및 발단: 무슨 일이 언제 어떻게 일어났는가?
-2. 주요 인물/단체 간의 이해관계 및 숨은 배경
-3. 대중 및 전문가들의 주요 찬반 쟁점과 논란 포인트
-4. 향후 이 사건이 사회·경제·문화적으로 미칠 중장기 파급 효과
-각 항목별로 구체적이고 깊이 있는 분석 내용을 bullet point로 작성해줘.`;
+너는 최정상 탐사보도 전문 기자이자 데이터 분석가야.
+Google Search를 활용하여 위 키워드에 대해 현재 언론에 보도된 실제 팩트, 구체적인 수치, 인물들의 실제 발언, 사건이 일어난 시점과 배경 원인을 완벽하게 조사해줘.
+
+다음 항목들을 구체적인 고유명사, 숫자, 실제 발언 인용과 함께 상세히 정리해줘:
+1. 구체적인 사건 개요와 타임라인 (언제, 어디서, 누가, 무엇을, 왜, 어떻게)
+2. 당사자 및 주요 관계자들의 실제 발언 및 대립되는 입장
+3. 대중과 커뮤니티, 전문가들이 격렬하게 논쟁하는 핵심 쟁점 3가지
+4. 이 사안이 향후 가져올 구체적인 사회적·경제적 파급 효과 및 결과
+
+절대 추상적이거나 두루뭉술한 말(~가 중요합니다 등)로 채우지 말고, 실제 확인된 사실과 디테일한 데이터 위주로 풍부하게 서술해줘.`;
 
     const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
     for (const model of candidateModels) {
@@ -188,47 +191,57 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: researchPrompt }] }],
-            generationConfig: { maxOutputTokens: 1200, temperature: 0.4 },
+            tools: [{ googleSearch: {} }],
+            generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
           }),
         });
         const data = await res.json() as any;
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-        if (text && text.length > 100) {
-          console.log(`🔍 [AI Flow 1단계: 리서치 완료] (${model})`);
+        if (text && text.length > 150) {
+          console.log(`🔍 [AI Flow 1단계: 실시간 Google 검색 기반 심층 리서치 완료] (${model}, ${text.length}자)`);
           return text;
         }
-      } catch {}
+      } catch (e: any) {
+        console.warn(`⚠️ [${model}] 실시간 검색 리서치 중 오류:`, e.message || String(e));
+      }
     }
     return `${trend.title} 관련 주요 언론 보도 내용: ${trend.newsTitle || ''}. ${trend.snippet || ''}`;
   }
 
   /**
    * [Google AI Flow 2단계 & 3단계: 전문 칼럼 집필 Flow]
-   * 리서치 결과를 토대로 목차를 설계하고, 약 1,500~2,000자의 완성도 높은 전문 리포트를 워드프레스용 HTML로 작성합니다.
+   * 실시간 검색 조사 자료를 토대로 2,000자 이상의 고품질 장문 심층 분석 리포트를 작성합니다.
    */
   async generateWordPressArticle(trend: TrendItem): Promise<{ title: string; html: string }> {
     console.log(`🚀 [Google AI Flow] "${trend.title}" 심층 리포트 생성 파이프라인 가동...`);
     const researchBrief = await this.runResearchFlow(trend);
 
     const writePrompt = `주제: [${trend.title}]
-리서치 심층 분석 자료:
+실시간 뉴스 검색 및 팩트체크 분석 자료:
 ${researchBrief}
 
-너는 유력 언론사 수석 칼럼니스트이자 SEO 전문 콘텐츠 에디터야.
-위 리서치 분석 자료를 기반으로, 포털 뉴스 1면이나 경제지에 실릴 법한 최고급 심층 분석 칼럼을 작성해줘.
+너는 유력 일간지 및 경제 매거진의 수석 탐사 전문 칼럼니스트이자 SEO 수석 에디터야.
+위 실시간 팩트체크 자료를 바탕으로, 독자가 읽었을 때 "정말 깊이 있고 유익하다"고 느낄 수 있는 최고급 퀄리티의 2,000자 이상 장문 심층 분석 리포트를 작성해줘.
 
-[작성 지침]
-1. 제목: 검색 유입과 호기심을 동시에 잡는 품격 있는 헤드라인 (예: [심층 분석] 5,500억 투자의 역설... ~사태가 남긴 3가지 교훈)
-2. 본문 구성:
-   - <h2> 도입: 사건의 발단과 현재 상황 총정리
-   - <h2> 쟁점 1: 대중이 분노(또는 열광)하는 핵심 이유
-   - <h2> 쟁점 2: 표면 아래 숨겨진 구조적 원인과 배경 분석
-   - <h2> 전망과 시사점: 앞으로 일어날 시나리오 및 독자들에게 주는 통찰
-3. 형식:
-   - 각 소제목(<h2>) 아래에 2~3개의 풍부한 문단(<p>)과 강조 태그(<strong>), 핵심 요약 리스트(<ul><li>)를 자연스럽게 섞어 가독성 극대화.
-   - 분량은 1,500자~2,000자 수준으로 구체적 사실과 논리적 근거를 바탕으로 꽉 찬 내용을 담을 것.
+[작성 및 구조화 가이드라인]
+1. 제목: 클릭을 유도하면서도 신뢰감을 주는 저널리즘형 헤드라인 (예: [심층 분석] ~의 충격적 전말과 숨겨진 3가지 쟁점)
+2. 본문 구성 (반드시 5개 섹션으로 깊이 있게 구성):
+   - <h2>1. 사건의 발단과 전개 과정: 구체적인 사실관계와 타임라인</h2>
+     (사건이 어떻게 촉발되었는지, 당시 현장 상황과 주요 인물의 행동/결정을 구체적 사실에 근거하여 3~4문단으로 상세히 서술)
+   - <h2>2. 수면 위로 드러난 핵심 쟁점과 찬반 여론 분석</h2>
+     (왜 여론이 들끓고 있는지, 찬성과 반대 혹은 비판과 옹호 입장의 논거를 <ul><li> 목록과 인용구 <blockquote> 등을 곁들여 입체적으로 비교)
+   - <h2>3. 구조적 원인과 배경: 겉으로 드러나지 않은 숨은 맥락</h2>
+     (단순 해프닝이 아닌 제도적, 문화적, 환경적 근본 배경을 날카롭게 해부)
+   - <h2>4. 전문가 진단 및 향후 사회·경제적 파급 효과</h2>
+     (이 사안이 향후 해당 분야, 시장, 대중에게 미칠 직간접적 영향 전망)
+   - <h2>5. 시사점 및 총평: 우리가 주목해야 할 관전 포인트</h2>
+     (독자들에게 던지는 메시지와 향후 지켜봐야 할 결정적 변수 정리)
+3. 스타일 & 포맷:
+   - 빈약한 한두 줄 서술 절대 금지. 각 섹션마다 구체적인 내용의 긴 문단(<p>)을 최소 2~3개씩 충실하게 채울 것.
+   - 가독성을 높이기 위해 주요 수치나 키워드에는 <strong> 태그를 자연스럽게 활용할 것.
    - 존댓말 정중체(~합니다, ~입니다) 사용.
-4. 첫 줄에 반드시 "TITLE: [제목]" 형식으로 제목을 출력하고, 한 줄 띄운 뒤 순수 본문 HTML만 출력할 것 (html, body, codeblock 제외).`;
+4. 출력 규칙:
+   - 첫 줄에 반드시 "TITLE: [제목]" 형식으로 제목을 출력하고, 한 줄 띄운 뒤 순수 본문 HTML만 출력할 것 (html, body, \`\`\`html 코드블록 태그는 절대 포함하지 말 것).`;
 
     const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
 
@@ -239,7 +252,8 @@ ${researchBrief}
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: writePrompt }] }],
-            generationConfig: { maxOutputTokens: 3000, temperature: 0.6 },
+            tools: [{ googleSearch: {} }],
+            generationConfig: { maxOutputTokens: 4000, temperature: 0.6 },
           }),
         });
 

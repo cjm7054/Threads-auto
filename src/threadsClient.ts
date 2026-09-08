@@ -48,7 +48,7 @@ export class ThreadsClient {
     formData.append("text", params.text);
 
     let requestUrl = url;
-    if (params.imageUrl) {
+    if (params.imageUrl && !params.linkAttachment) {
       formData.append("media_type", "IMAGE");
       formData.append("image_url", params.imageUrl);
       const encUrl = encodeURIComponent(params.imageUrl);
@@ -63,6 +63,7 @@ export class ThreadsClient {
 
     if (params.linkAttachment) {
       formData.append("link_attachment", params.linkAttachment);
+      console.log(`[Threads] 링크 프리뷰 카드 첨부: ${params.linkAttachment}`);
     }
 
     if (params.replyToId) {

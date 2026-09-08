@@ -76,25 +76,23 @@ async function main() {
     console.log("📝 [1단계] 생성된 스레드 본문 (고도달 포스트):\n" + generatedText);
     console.log("------------------------------------------");
 
-    // 3단계 고화질 미디어 파이프라인:
-    // 1순위: 실제 언론사 뉴스 기사 원문(newsUrl)의 초고화질 대표 보도 사진(og:image 1200x630+) 추출 후 워드프레스 CDN 업로드
-    // 2순위: og:image 실패 시 구글 트렌드 썸네일(pictureUrl) 업로드 시도
-    // 3순위: 뉴스 사진이 없거나 실패할 경우, 다큐멘터리/실사 포토저널리즘 스타일 AI 생성
+    // [1단계] 고화질 실제 뉴스 보도 사진 준비 및 워드프레스 미디어 라이브러리 업로드
     let postImageUrl: string | undefined = undefined;
+    let featuredMediaId: number | undefined = undefined;
+    const wpClient = (wpUsername && wpAppPassword) ? new WordPressClient(wpUrl, wpUsername, wpAppPassword) : null;
 
-    if (wpUsername && wpAppPassword) {
-      const wpClient = new WordPressClient(wpUrl, wpUsername, wpAppPassword);
-
-      // 1순위: 실제 언론사 원문 페이지에서 초고화질 공식 보도 사진(og:image) 탐색
+    if (wpClient) {
+      // 1순위: 실제 언론사 원문 페이지에서 초고화질 공식 보도 사진(og:image 1200x630+) 추출
       if (selectedTrend.newsUrl) {
         console.log(`🔎 [실제 뉴스 원문 탐색] 언론사 원문 기사에서 초고화질 공식 보도 사진(og:image) 추출 시도... (${selectedTrend.newsUrl})`);
         const ogImage = await trendCollector.fetchArticleOgImage(selectedTrend.newsUrl);
         if (ogImage) {
           console.log(`📸 [언론사 원문 고화질 사진 발견] ${ogImage}`);
-          const uploadedUrl = await wpClient.uploadMedia(ogImage, "hd_news_photo.jpg");
-          if (uploadedUrl) {
-            postImageUrl = uploadedUrl;
-            console.log(`🌟 [실제 언론사 초고화질 보도 사진 확정!] ${postImageUrl}`);
+          const mediaResult = await wpClient.uploadMediaWithId(ogImage, "hd_news_photo.jpg");
+          if (mediaResult) {
+            postImageUrl = mediaResult.url;
+            featuredMediaId = mediaResult.id;
+            console.log(`🌟 [실제 언론사 초고화질 보도 사진 확정!] ${postImageUrl} (미디어 ID: ${featuredMediaId})`);
           }
         }
       }
@@ -103,9 +101,10 @@ async function main() {
       if (!postImageUrl && selectedTrend.pictureUrl) {
         console.log(`📸 [구글 트렌드 썸네일 변환] 사진을 워드프레스 미디어로 변환 중... (${selectedTrend.pictureUrl})`);
         try {
-          const uploadedUrl = await wpClient.uploadMedia(selectedTrend.pictureUrl, "news_photo.jpg");
-          if (uploadedUrl) {
-            postImageUrl = uploadedUrl;
+          const mediaResult = await wpClient.uploadMediaWithId(selectedTrend.pictureUrl, "news_photo.jpg");
+          if (mediaResult) {
+            postImageUrl = mediaResult.url;
+            featuredMediaId = mediaResult.id;
             console.log(`🌟 [뉴스 보도 사진 확정] ${postImageUrl}`);
           }
         } catch (mediaErr) {
@@ -119,13 +118,12 @@ async function main() {
       const rawAiImageUrl = await aiWriter.generateImageUrl(selectedTrend);
       console.log(`🖼️ [다큐멘터리 보도사진 원본 준비] ${rawAiImageUrl}`);
 
-      // AI 이미지도 워드프레스 미디어 라이브러리로 사전 캐싱/업로드하여 메타 스레드 CDN 타임아웃 방지
-      if (wpUsername && wpAppPassword) {
+      if (wpClient) {
         try {
-          const wpClient = new WordPressClient(wpUrl, wpUsername, wpAppPassword);
-          const uploadedAiUrl = await wpClient.uploadMedia(rawAiImageUrl, "ai_editorial_photo.jpg");
-          if (uploadedAiUrl) {
-            postImageUrl = uploadedAiUrl;
+          const mediaResult = await wpClient.uploadMediaWithId(rawAiImageUrl, "ai_editorial_photo.jpg");
+          if (mediaResult) {
+            postImageUrl = mediaResult.url;
+            featuredMediaId = mediaResult.id;
             console.log(`🌟 [AI 보도사진 CDN 캐싱 완료] ${postImageUrl}`);
           }
         } catch (e: any) {
@@ -138,11 +136,40 @@ async function main() {
       }
     }
 
-    // 1단계: 본문 + 고화질 이미지 포스팅 (이미지 실패 시 텍스트 단독 자동 폴백)
+    // [2단계] 워드프레스 상세 리포트를 선제 발행하여 공식 대표 이미지(featured_media) 등록
+    let actualWpUrl: string | undefined = undefined;
+    if (wpClient) {
+      console.log(`📝 [워드프레스] "${selectedTrend.title}" 주제로 블로그 상세 리포트 생성 중...`);
+      try {
+        const wpArticle = await aiWriter.generateWordPressArticle(selectedTrend);
+        const wpResult = await wpClient.createPost(wpArticle.title, wpArticle.html, featuredMediaId);
+
+        if (wpResult.success && wpResult.postUrl) {
+          actualWpUrl = wpResult.postUrl;
+          console.log(`🌐 [워드프레스 실제 글 발행 성공!] ${actualWpUrl}`);
+        }
+      } catch (wpErr: any) {
+        console.warn(`⚠️ 워드프레스 자동 발행 실패:`, wpErr.message || wpErr);
+      }
+    }
+
+    // [3단계] 스레드 본문 포스팅:
+    // 워드프레스 글(actualWpUrl)이 발행된 경우 -> 링크 카드(linkAttachment)로 등록하여
+    // 사진을 누르면 내 블로그로 즉시 이동하게 만들고,
+    // 워드프레스가 실패한 경우 -> 고화질 이미지 단독 포스트로 자동 폴백
     let result = await client.post({
       text: generatedText,
-      imageUrl: postImageUrl,
+      linkAttachment: actualWpUrl,
+      imageUrl: actualWpUrl ? undefined : postImageUrl,
     });
+
+    if (!result.success && actualWpUrl && postImageUrl) {
+      console.warn(`⚠️ [링크 카드 포스팅 실패] 이미지 단독 포스팅으로 폴백 시도합니다... (${result.error})`);
+      result = await client.post({
+        text: generatedText,
+        imageUrl: postImageUrl,
+      });
+    }
 
     if (!result.success && postImageUrl) {
       console.warn(`⚠️ [이미지 컨테이너 실패] 텍스트 단독 포스팅으로 자동 전환합니다... (${result.error})`);
@@ -153,9 +180,9 @@ async function main() {
 
     if (result.success && result.threadId) {
       historyManager.addRecord(selectedTrend.title, result.threadId);
-      console.log(`🎉 [본문 발행 완료] (ID: ${result.threadId})`);
+      console.log(`🎉 [스레드 본문 발행 완료] (ID: ${result.threadId})`);
 
-      // 2단계: 워드프레스 블로그 실제 상세글 자동 발행 & 첫 대댓글(Reply) 연쇄 발행
+      // [4단계] 첫 대댓글(Reply) 발행: 쿠팡 파트너스 + 추가 안내
       try {
         const monetizationConfigPath = resolve(process.cwd(), "config", "monetization.json");
         let mConfig: any = {};
@@ -164,32 +191,13 @@ async function main() {
           mConfig = JSON.parse(readFileSync(monetizationConfigPath, "utf-8"));
         }
 
-        let actualWpUrl: string | undefined = undefined;
-
-        // 워드프레스에 실제 1,500자 상세 분석 아티클 자동 포스팅
-        if (wpUsername && wpAppPassword) {
-          console.log(`📝 [워드프레스] "${selectedTrend.title}" 주제로 블로그 상세 리포트 생성 중...`);
-          try {
-            const wpArticle = await aiWriter.generateWordPressArticle(selectedTrend);
-            const wpClient = new WordPressClient(wpUrl, wpUsername, wpAppPassword);
-            const wpResult = await wpClient.createPost(wpArticle.title, wpArticle.html);
-
-            if (wpResult.success && wpResult.postUrl) {
-              actualWpUrl = wpResult.postUrl;
-              console.log(`🌐 [워드프레스 실제 글 발행 성공!] ${actualWpUrl}`);
-            }
-          } catch (wpErr: any) {
-            console.warn(`⚠️ 워드프레스 자동 발행 실패 (기본 메인 링크로 대체):`, wpErr.message || wpErr);
-          }
-        }
-
         const replyText = await aiWriter.generateReplyComment(selectedTrend, mConfig, actualWpUrl);
-        console.log(`💬 [2단계] 첫 번째 수익 대댓글 자동 작성 중... (Reply to: ${result.threadId})`);
+        console.log(`💬 [수익 대댓글 자동 작성 중] (Reply to: ${result.threadId})`);
         console.log("------------------------------------------");
         console.log("📝 대댓글 본문:\n" + replyText);
         console.log("------------------------------------------");
 
-        // Threads API 딜레이 및 재시도 (이미지가 포함된 본문은 인덱싱에 10~15초 소요됨)
+        // Threads API 딜레이 및 재시도
         let replySuccess = false;
         if (!isDryRun) {
           console.log("⏳ 본문 인덱싱 대기 중 (12초)...");

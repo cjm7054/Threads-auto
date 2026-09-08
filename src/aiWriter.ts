@@ -196,7 +196,8 @@ Google Search를 활용하여 위 키워드에 대해 현재 언론에 보도된
           }),
         });
         const data = await res.json() as any;
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const text = parts.map((p: any) => p.text || "").join("").trim();
         if (text && text.length > 150) {
           console.log(`🔍 [AI Flow 1단계: 실시간 Google 검색 기반 심층 리서치 완료] (${model}, ${text.length}자)`);
           return text;
@@ -263,7 +264,8 @@ ${researchBrief}
           continue;
         }
 
-        const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const rawOutput = parts.map((p: any) => p.text || "").join("").trim();
 
         if (rawOutput) {
           const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/m);

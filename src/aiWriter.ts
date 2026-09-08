@@ -143,70 +143,113 @@ Do not include quotation marks, style jargon, or explanations. Output ONLY the p
   }
 
   /**
-   * 워드프레스 블로그용 고품질 심층 분석 기사(HTML 형식, 약 1,500자 내외)를 생성합니다.
-   * 구글 애드센스 승인 및 체류시간 극대화에 최적화된 구조로 작성됩니다.
+   * [Google AI Flow 1단계: 심층 리서치 및 쟁점 분석]
+   * 단순 키워드를 바탕으로 핵심 사건, 사실 관계, 대중 반응, 향후 파장을 입체적으로 분석합니다.
    */
-  async generateWordPressArticle(trend: TrendItem): Promise<{ title: string; html: string }> {
-    const prompt = `대한민국 실시간 이슈 [${trend.title}]에 대한 블로그용 고품질 심층 분석 리포트를 작성해줘.
-관련 뉴스: "${trend.newsTitle || ''}"
+  private async runResearchFlow(trend: TrendItem): Promise<string> {
+    const researchPrompt = `키워드: [${trend.title}]
+관련 기사: "${trend.newsTitle || ''}"
 요약 내용: "${trend.snippet || ''}"
 
-[작성 가이드라인]
-1. 제목은 검색 유입과 호기심을 자극하는 매력적인 제목으로 1개 작성 (예: [이슈 분석] ~한 이유와 향후 전망 정리).
-2. 본문은 네이버/구글 검색엔진 최적화(SEO)를 고려하여 소제목(<h2>, <h3>)과 문단(<p>), 글머리 기호(<ul>, <li>)가 포함된 깔끔한 HTML 태그 형태로 작성.
-3. 구성 순서:
-   - 도입부: 사건/이슈의 배경과 핵심 팩트 정리
-   - 본론 1: 대중들의 반응과 주요 쟁점 분석
-   - 본론 2: 전문가 의견 및 향후 사회적/경제적 파급 효과
-   - 결론: 요약 및 시사점, 독자의 생각을 묻는 마무리
-4. 전체 분량은 약 1,000자~1,500자 정도로 풍부하고 신뢰감 있는 문체(~합니다, ~입니다)로 작성.
-5. <html>, <body>, <h1> 태그나 코드블럭 따옴표(\`\`\`html)는 일절 쓰지 말고, 오직 바로 워드프레스 본문에 들어갈 본문 HTML만 출력해.
-첫 번째 줄에는 반드시 "TITLE: [제목 내용]" 형식으로 제목을 명시하고, 한 줄 띄운 뒤 본문 HTML을 출력할 것.`;
+너는 전문 시사·트렌드 탐사 저널리스트이자 데이터 분석가야.
+위 이슈에 대해 다음 4가지 관점에서 깊이 있는 리서치 브리핑을 작성해줘:
+1. 핵심 팩트 및 발단: 무슨 일이 언제 어떻게 일어났는가?
+2. 주요 인물/단체 간의 이해관계 및 숨은 배경
+3. 대중 및 전문가들의 주요 찬반 쟁점과 논란 포인트
+4. 향후 이 사건이 사회·경제·문화적으로 미칠 중장기 파급 효과
+각 항목별로 구체적이고 깊이 있는 분석 내용을 bullet point로 작성해줘.`;
 
-    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash"];
-
-    for (const currentModel of candidateModels) {
+    const candidateModels = ["gemini-1.5-pro", "gemini-3.6-flash", "gemini-2.5-flash"];
+    for (const model of candidateModels) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
-        const response = await fetch(url, {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { maxOutputTokens: 2500, temperature: 0.7 },
+            contents: [{ parts: [{ text: researchPrompt }] }],
+            generationConfig: { maxOutputTokens: 1200, temperature: 0.4 },
+          }),
+        });
+        const data = await res.json() as any;
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text && text.length > 100) {
+          console.log(`🔍 [AI Flow 1단계: 리서치 완료] (${model})`);
+          return text;
+        }
+      } catch {}
+    }
+    return `${trend.title} 관련 주요 언론 보도 내용: ${trend.newsTitle || ''}. ${trend.snippet || ''}`;
+  }
+
+  /**
+   * [Google AI Flow 2단계 & 3단계: 전문 칼럼 집필 Flow]
+   * 리서치 결과를 토대로 목차를 설계하고, 약 1,500~2,000자의 완성도 높은 전문 리포트를 워드프레스용 HTML로 작성합니다.
+   */
+  async generateWordPressArticle(trend: TrendItem): Promise<{ title: string; html: string }> {
+    console.log(`🚀 [Google AI Flow] "${trend.title}" 심층 리포트 생성 파이프라인 가동...`);
+    const researchBrief = await this.runResearchFlow(trend);
+
+    const writePrompt = `주제: [${trend.title}]
+리서치 심층 분석 자료:
+${researchBrief}
+
+너는 유력 언론사 수석 칼럼니스트이자 SEO 전문 콘텐츠 에디터야.
+위 리서치 분석 자료를 기반으로, 포털 뉴스 1면이나 경제지에 실릴 법한 최고급 심층 분석 칼럼을 작성해줘.
+
+[작성 지침]
+1. 제목: 검색 유입과 호기심을 동시에 잡는 품격 있는 헤드라인 (예: [심층 분석] 5,500억 투자의 역설... ~사태가 남긴 3가지 교훈)
+2. 본문 구성:
+   - <h2> 도입: 사건의 발단과 현재 상황 총정리
+   - <h2> 쟁점 1: 대중이 분노(또는 열광)하는 핵심 이유
+   - <h2> 쟁점 2: 표면 아래 숨겨진 구조적 원인과 배경 분석
+   - <h2> 전망과 시사점: 앞으로 일어날 시나리오 및 독자들에게 주는 통찰
+3. 형식:
+   - 각 소제목(<h2>) 아래에 2~3개의 풍부한 문단(<p>)과 강조 태그(<strong>), 핵심 요약 리스트(<ul><li>)를 자연스럽게 섞어 가독성 극대화.
+   - 분량은 1,500자~2,000자 수준으로 구체적 사실과 논리적 근거를 바탕으로 꽉 찬 내용을 담을 것.
+   - 존댓말 정중체(~합니다, ~입니다) 사용.
+4. 첫 줄에 반드시 "TITLE: [제목]" 형식으로 제목을 출력하고, 한 줄 띄운 뒤 순수 본문 HTML만 출력할 것 (html, body, codeblock 제외).`;
+
+    const candidateModels = ["gemini-1.5-pro", "gemini-3.6-flash", "gemini-2.5-flash"];
+
+    for (const model of candidateModels) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: writePrompt }] }],
+            generationConfig: { maxOutputTokens: 3000, temperature: 0.6 },
           }),
         });
 
         const data = await response.json() as any;
+        const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
-        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const rawOutput = data.candidates[0].content.parts[0].text.trim();
-
+        if (rawOutput) {
           const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/m);
-          const articleTitle = titleMatch ? titleMatch[1].trim() : `[이슈 분석] ${trend.title} - 핵심 내용과 주요 쟁점 정리`;
+          const articleTitle = titleMatch ? titleMatch[1].trim() : `[심층 분석] ${trend.title} - 핵심 쟁점과 향후 파장 총정리`;
           const htmlContent = rawOutput.replace(/^TITLE:\s*.+\n*/m, "").replace(/```html|```/g, "").trim();
 
-          if (htmlContent.length >= 300) {
-            console.log(`✅ [${currentModel}] 1,500자 상세 워드프레스 기사 생성 완료! (${htmlContent.length}자)`);
+          if (htmlContent.length >= 500) {
+            console.log(`✨ [Google AI Flow 집필 완료] 고품질 칼럼 완성! (${model}, ${htmlContent.length}자)`);
             return { title: articleTitle, html: htmlContent };
           }
-        } else {
-          console.warn(`⚠️ [${currentModel}] 워드프레스 본문 생성 실패:`, data.error?.message || response.statusText);
         }
       } catch (e: any) {
-        console.warn(`⚠️ [${currentModel}] 워드프레스 글 생성 오류:`, e.message || String(e));
+        console.warn(`⚠️ [${model}] 칼럼 집필 중 오류, 대체 모델 시도:`, e.message || String(e));
       }
     }
 
-    const fallbackTitle = `[실시간 트렌드] ${trend.title} 관련 주요 소식 및 전체 분석`;
+    // 최후 비상 템플릿도 풍부하게 보강
+    const fallbackTitle = `[이슈 리포트] ${trend.title} - 주요 팩트 체크와 쟁점 분석`;
     const fallbackHtml = `
-<h2>1. ${trend.title} 이슈 개요</h2>
-<p>최근 실시간 검색어 및 주요 언론을 통해 <strong>${trend.title}</strong> 관련 소식이 전해지며 많은 사람들의 관심이 쏟아지고 있습니다.</p>
-${trend.newsTitle ? `<p>주요 보도 내용에 따르면 "${trend.newsTitle}" 소식이 중심이 되어 온·오프라인에서 다양한 반응이 이어지고 있습니다.</p>` : ''}
-<h2>2. 대중의 반응과 핵심 쟁점</h2>
-<p>${trend.snippet || '현재 해당 사안을 두고 여러 커뮤니티와 SNS에서 다양한 관점의 논의가 활발히 전개되고 있는 상황입니다.'}</p>
-<h2>3. 향후 전망 및 정리</h2>
-<p>앞으로 추가적인 공식 발표나 전개 상황에 따라 새로운 사실이 확인될 것으로 보이며, 지속적인 관심이 필요해 보입니다.</p>
+<h2>1. ${trend.title} 사태의 배경과 핵심 팩트</h2>
+<p>최근 온·오프라인을 뜨겁게 달구고 있는 <strong>${trend.title}</strong> 이슈는 단순한 일회성 사건을 넘어 사회적 관심사로 급부상하고 있습니다.</p>
+<p>${trend.newsTitle ? `주요 언론 보도에 따르면 "${trend.newsTitle}" 소식이 전해지며 다양한 해석과 반응이 엇갈리고 있습니다.` : ''}</p>
+<h2>2. 핵심 쟁점과 대중의 반응</h2>
+<p>${trend.snippet || '전문가들은 이번 사안이 지닌 구조적인 문제점과 향후 파급력에 주목하고 있으며, 온라인 커뮤니티에서도 찬반 논쟁이 치열하게 전개되고 있습니다.'}</p>
+<h2>3. 향후 전망 및 관전 포인트</h2>
+<p>이번 사안의 전개 방향에 따라 관련 업계와 시장에 적지 않은 변화가 예상되며, 공식적인 후속 발표를 주의 깊게 지켜볼 필요가 있습니다.</p>
 `;
     return { title: fallbackTitle, html: fallbackHtml };
   }

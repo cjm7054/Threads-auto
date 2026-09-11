@@ -142,14 +142,14 @@ async function main() {
       }
     }
 
-    // [2단계] 스레드 본문 및 고화질 이미지 단독 포스팅 (외부 블로그/댓글 링크 배제)
+    // [2단계] 스레드 포스팅: 이미지가 있으면 이미지 첨부 시도, 실패 시 즉시 텍스트 단독으로 안전 전환
     let result = await client.post({
       text: generatedText,
       imageUrl: postImageUrl,
     });
 
     if (!result.success && postImageUrl) {
-      console.warn(`⚠️ [이미지 컨테이너 실패] 텍스트 단독 포스팅으로 자동 전환합니다... (${result.error})`);
+      console.warn(`⚠️ [이미지 컨테이너/발행 실패] 텍스트 단독 포스팅으로 안전하게 전환합니다... (사유: ${result.error})`);
       result = await client.post({
         text: generatedText,
       });
@@ -160,7 +160,7 @@ async function main() {
       console.log(`🎉 [스레드 본문 발행 완료] (ID: ${result.threadId})`);
       console.log(`✨ [키워드: ${selectedTrend.title}] 고품질 스레드 자동 포스팅 완료!`);
     } else {
-      console.error(`❌ 포스팅 실패: ${result.error}`);
+      console.error(`❌ 포스팅 최종 실패: ${result.error}`);
       process.exit(1);
     }
 

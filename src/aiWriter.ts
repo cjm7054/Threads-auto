@@ -33,7 +33,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 5. 절대로 영어 체크리스트, "Here is the text:", 프롬프트 설명 같은 잡담을 쓰지 말고 오직 한국어 게시글 본문만 출력하세요.`;
 
     // Google Gemini API 100% 무료 티어(Free Tier) 지원 모델 우선순위 (유료 Pro 모델 완전 배제)
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {
@@ -126,7 +126,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 6. [절대 금지]: 판타지, SF, 외계 행성, 우주선, 애니메이션, 일러스트, 인물(여성/남성)의 정면 클로즈업 얼굴, 글자, 텍스트, 로고 금지.
 오직 영문 프롬프트 문장만 단독으로 출력해.`;
 
-      const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash"];
+      const candidateModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
       let visualPrompt = "";
 
       for (const model of candidateModels) {

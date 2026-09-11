@@ -90,23 +90,25 @@ export class ThreadsClient {
   /**
    * 미디어 처리 상태 대기 (이미지/동영상 컨테이너인 경우 FINISHED 상태 대기)
    */
-  async waitForContainer(containerId: string, maxAttempts = 10, intervalMs = 2000): Promise<void> {
+  async waitForContainer(containerId: string, maxAttempts = 12, intervalMs = 2500): Promise<void> {
     if (this.dryRun) return;
 
     for (let i = 0; i < maxAttempts; i++) {
       const url = `${this.baseUrl}/${containerId}?fields=status,error_message&access_token=${this.accessToken}`;
       const res = await fetch(url);
-      const data = await res.json() as { status?: string; error_message?: string };
+      const data = await res.json() as { status?: string; error_message?: string; error?: any };
 
       if (data.status === "FINISHED") {
         return;
       }
-      if (data.status === "ERROR") {
-        throw new Error(`컨테이너 처리 오류: ${data.error_message || "알 수 없는 오류"}`);
+      if (data.status === "ERROR" || data.error) {
+        throw new Error(`컨테이너 미디어 처리 오류: ${data.error_message || data.error?.message || "미디어 다운로드 또는 처리 실패"}`);
       }
 
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
+
+    throw new Error(`컨테이너 미디어 처리 대기 시간 초과 (ID: ${containerId})`);
   }
 
   /**

@@ -28,12 +28,12 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
 [작성 요구사항]
 1. 사람들의 흥미를 끄는 강력한 첫 줄 훅(Hook)으로 시작하세요.
 2. 2~3개의 짧은 문단으로 친근하고 자연스러운 구어체(~해요, ~인 것 같아요, ~대단하네요)로 읽기 쉽게 줄바꿈을 넣어 작성하세요.
-3. 마지막 부분에는 "다들 이 소식 어떻게 생각하시나요? 댓글로 의견 들려주세요! 👇\n\n👉 사건의 전말과 심층 분석 리포트는 아래 기사 카드를 누르면 바로 확인하실 수 있습니다!" 를 자연스럽게 넣으세요.
+3. 마지막 부분에는 독자들의 자연스러운 소통과 반응을 이끌어내는 문장(예: "다들 이 소식 어떻게 생각하시나요? 여러분의 생각을 댓글로 들려주세요! 👇")을 넣으세요. (절대 블로그나 외부 링크, 기사 카드를 누르라는 멘트는 넣지 마세요)
 4. 마지막에 #스레드 #트렌드 #${trend.title.replace(/\s+/g, '')} 해시태그를 포함하세요.
 5. 절대로 영어 체크리스트, "Here is the text:", 프롬프트 설명 같은 잡담을 쓰지 말고 오직 한국어 게시글 본문만 출력하세요.`;
 
-    // Google Gemini API 최신 정식 지원 모델 우선순위
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
+    // Google Gemini API 100% 무료 티어(Free Tier) 지원 모델 우선순위 (유료 Pro 모델 완전 배제)
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash"];
     let lastError = "";
 
     for (const currentModel of candidateModels) {
@@ -81,7 +81,7 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
     }
 
     console.warn(`⚠️ Gemini API 응답 제한으로 트렌드 기반 맞춤 템플릿으로 본문을 구성합니다: ${lastError}`);
-    return `🔥 지금 실시간으로 가장 뜨거운 화제의 이슈: [${trend.title}]!\n\n${trend.newsTitle ? '최근 보도에 따르면 "' + trend.newsTitle + '" 소식이 전해지며 많은 사람들의 관심이 집중되고 있습니다.' : '관련 소식이 전해지며 다양한 의견과 반응이 쏟아지고 있는 상황인데요.'}\n\n${trend.snippet || '과연 앞으로 어떤 방향으로 전개될지 귀추가 주목됩니다.'}\n\n다들 이 소식 어떻게 생각하시나요? 댓글로 여러분의 생각을 들려주세요! 👇\n\n👉 사건의 전말과 심층 분석 리포트는 아래 기사 카드를 누르면 바로 확인하실 수 있습니다!\n\n#스레드 #트렌드 #${trend.title.replace(/\s+/g, '')} #실시간이슈`;
+    return `🔥 지금 실시간으로 가장 뜨거운 화제의 이슈: [${trend.title}]!\n\n${trend.newsTitle ? '최근 보도에 따르면 "' + trend.newsTitle + '" 소식이 전해지며 많은 사람들의 관심이 집중되고 있습니다.' : '관련 소식이 전해지며 다양한 의견과 반응이 쏟아지고 있는 상황인데요.'}\n\n${trend.snippet || '과연 앞으로 어떤 방향으로 전개될지 귀추가 주목됩니다.'}\n\n다들 이 소식 어떻게 생각하시나요? 댓글로 여러분의 생각을 들려주세요! 👇\n\n#스레드 #트렌드 #${trend.title.replace(/\s+/g, '')} #실시간이슈`;
   }
 
   /**
@@ -201,7 +201,8 @@ ${trend.snippet ? '요약: ' + trend.snippet : ''}
    - 가독성을 높이기 위해 핵심 키워드나 수치에는 <strong> 태그를 적극 활용할 것.
    - 순수 HTML 내용만 작성할 것 (\`\`\`html 코드 블록 마크다운이나 <html>, <body> 태그는 일체 쓰지 말 것).`;
 
-    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
+    // 100% 영구 무료 Flash 모델만 사용 (과금 가능성 원천 차단)
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash"];
 
     for (const model of candidateModels) {
       try {

@@ -72,8 +72,14 @@ async function main() {
       generatedText = await aiWriter.generatePost(selectedTrend);
     }
 
+    // [기능 추가] 스레드 글 내용 하단에 관련 기사 또는 홈페이지 링크 연결
+    if (selectedTrend.newsUrl) {
+      const linkLabel = selectedTrend.newsTitle ? `📰 관련 기사 원문: ${selectedTrend.newsTitle}` : "🔗 관련 기사 바로가기";
+      generatedText = `${generatedText}\n\n${linkLabel}\n👉 ${selectedTrend.newsUrl}`;
+    }
+
     console.log("------------------------------------------");
-    console.log("📝 [1단계] 생성된 스레드 본문 (고도달 포스트):\n" + generatedText);
+    console.log("📝 [1단계] 생성된 스레드 본문 (링크 포함):\n" + generatedText);
     console.log("------------------------------------------");
 
     // [1단계] 고화질 실제 뉴스 보도 사진 준비 및 워드프레스 미디어 라이브러리 업로드
@@ -136,40 +142,11 @@ async function main() {
       }
     }
 
-    // [2단계] 워드프레스 상세 리포트를 선제 발행하여 공식 대표 이미지(featured_media) 등록
-    let actualWpUrl: string | undefined = undefined;
-    if (wpClient) {
-      console.log(`📝 [워드프레스] "${selectedTrend.title}" 주제로 블로그 상세 리포트 생성 중...`);
-      try {
-        const wpArticle = await aiWriter.generateWordPressArticle(selectedTrend);
-        const wpResult = await wpClient.createPost(wpArticle.title, wpArticle.html, featuredMediaId);
-
-        if (wpResult.success && wpResult.postUrl) {
-          actualWpUrl = wpResult.postUrl;
-          console.log(`🌐 [워드프레스 실제 글 발행 성공!] ${actualWpUrl}`);
-        }
-      } catch (wpErr: any) {
-        console.warn(`⚠️ 워드프레스 자동 발행 실패:`, wpErr.message || wpErr);
-      }
-    }
-
-    // [3단계] 스레드 본문 포스팅:
-    // 워드프레스 글(actualWpUrl)이 발행된 경우 -> 링크 카드(linkAttachment)로 등록하여
-    // 사진을 누르면 내 블로그로 즉시 이동하게 만들고,
-    // 워드프레스가 실패한 경우 -> 고화질 이미지 단독 포스트로 자동 폴백
+    // [2단계] 스레드 본문 및 고화질 이미지 단독 포스팅 (외부 블로그/댓글 링크 배제)
     let result = await client.post({
       text: generatedText,
-      linkAttachment: actualWpUrl,
-      imageUrl: actualWpUrl ? undefined : postImageUrl,
+      imageUrl: postImageUrl,
     });
-
-    if (!result.success && actualWpUrl && postImageUrl) {
-      console.warn(`⚠️ [링크 카드 포스팅 실패] 이미지 단독 포스팅으로 폴백 시도합니다... (${result.error})`);
-      result = await client.post({
-        text: generatedText,
-        imageUrl: postImageUrl,
-      });
-    }
 
     if (!result.success && postImageUrl) {
       console.warn(`⚠️ [이미지 컨테이너 실패] 텍스트 단독 포스팅으로 자동 전환합니다... (${result.error})`);
@@ -181,9 +158,7 @@ async function main() {
     if (result.success && result.threadId) {
       historyManager.addRecord(selectedTrend.title, result.threadId);
       console.log(`🎉 [스레드 본문 발행 완료] (ID: ${result.threadId})`);
-      console.log("ℹ️ 스레드 정책 준수: 자동 상업성 대댓글 발행을 생략하고 본문 링크 카드로 안전하게 연결합니다.");
-
-      console.log(`✨ [키워드: ${selectedTrend.title}] 하이브리드 자동 포스팅 파이프라인 완료!`);
+      console.log(`✨ [키워드: ${selectedTrend.title}] 고품질 스레드 자동 포스팅 완료!`);
     } else {
       console.error(`❌ 포스팅 실패: ${result.error}`);
       process.exit(1);
